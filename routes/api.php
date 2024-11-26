@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\EmailVerificationController;
+use App\Http\Controllers\ExamDetailController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\ResetPasswordController;
@@ -34,4 +35,8 @@ Route::group(
         Route::post('password/reset/code/verify', [ResetPasswordController::class, 'verifyOtp']);
         Route::post('password/reset', [ResetPasswordController::class, 'reset']);
         Route::post('password/reset/code/resend', [ResetPasswordController::class, 'resendOtp']);
-});
+
+        Route::middleware('auth:sanctum')->group(function () {
+            Route::resource('exam-details', ExamDetailController::class)->except(['index']);
+        });
+    });
