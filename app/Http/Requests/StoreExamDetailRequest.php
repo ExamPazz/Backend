@@ -3,7 +3,8 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
+
 
 class StoreExamDetailRequest extends FormRequest
 {
@@ -23,7 +24,7 @@ class StoreExamDetailRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'exam_name' => 'required|string',
+            'exam_name' => ['required', 'string', Rule::in(['JAMB', 'WAEC', 'NECO'])],
             'registration_number' => 'nullable|string',
             'has_written_before' => 'required|boolean',
             'exam_year' => 'nullable|integer|digits:4',

@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('exam_details', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->string('exam_name');
+            $table->enum('exam_name', ['JAMB', 'WAEC', 'NECO']);            
             $table->string('registration_number')->nullable();
             $table->boolean('has_written_before');
             $table->year('exam_year')->nullable();
