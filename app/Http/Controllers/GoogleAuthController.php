@@ -17,7 +17,10 @@ class GoogleAuthController extends Controller
             $user = (new GoogleAuthService())->setUpAuthentication($request);
             $token = JWTAuth::fromUser($user);
         } catch (\Exception $e) {
-            $this->errorResponse($e->getMessage(), 409);
+            return response()->json([
+                'error' => true,
+                'message' => $e->getMessage(),
+            ], 409);
         }
 
         return ($token) ? $this->respondWithToken($token) : $this->errorResponse('Unauthenticated token', 409);
