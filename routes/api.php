@@ -42,5 +42,6 @@ Route::group(
         Route::middleware('auth:sanctum')->group(function () {
             Route::resource('exam-details', ExamDetailController::class)->except(['index']);
             Route::get('/user/profile', [UserProfileController::class, 'getAuthenticatedUser']);
+            Route::put('/user/profile', [UserProfileController::class, 'updateUser']);
         });
     });
