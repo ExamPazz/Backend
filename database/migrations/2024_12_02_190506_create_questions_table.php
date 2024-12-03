@@ -1,0 +1,40 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('questions', function (Blueprint $table) {
+            $table->id();
+            $table->integer('year');
+            $table->text('question');
+            $table->string('image_url')->nullable();
+            $table->text('option_a');
+            $table->text('option_b');
+            $table->text('option_c');
+            $table->text('option_d');
+            $table->char('correct_option', 1)->default('a');
+            $table->text('solution');
+            $table->string('section_id'); // Foreign key to sections
+            $table->string('chapter_id'); // Foreign key to chapters
+            $table->foreignId('topic_id')->constrained('topics'); // FK to topics
+            $table->foreignId('objective_id')->constrained('objectives'); // FK to objectives
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('questions');
+    }
+};

@@ -7,6 +7,7 @@ use App\Http\Controllers\LoginController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\ResetPasswordController;
 use App\Http\Controllers\UserProfileController;
+use App\Http\Controllers\CsvImportController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -38,6 +39,9 @@ Route::group(
         Route::post('password/reset', [ResetPasswordController::class, 'reset']);
         Route::post('password/reset/code/resend', [ResetPasswordController::class, 'resendOtp']);
         Route::post('auth/google', [GoogleAuthController::class, 'store']);
+
+        Route::post('/csv', [CsvImportController::class, 'importCsv']);
+
 
         Route::middleware('auth:sanctum')->group(function () {
             Route::resource('exam-details', ExamDetailController::class)->except(['index']);
