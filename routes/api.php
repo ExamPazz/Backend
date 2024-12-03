@@ -8,6 +8,7 @@ use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\ResetPasswordController;
 use App\Http\Controllers\UserProfileController;
 use App\Http\Controllers\CsvImportController;
+use App\Http\Controllers\MockExamController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -47,5 +48,6 @@ Route::group(
             Route::resource('exam-details', ExamDetailController::class)->except(['index']);
             Route::get('/user/profile', [UserProfileController::class, 'getAuthenticatedUser']);
             Route::put('/user/profile', [UserProfileController::class, 'updateUser']);
+            Route::post('/mock/exam', [MockExamController::class, 'generateMockExam']);
         });
     });

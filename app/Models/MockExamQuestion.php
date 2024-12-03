@@ -8,4 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class MockExamQuestion extends Model
 {
     use HasFactory;
+
+    protected $guarded = [];
+
 }
