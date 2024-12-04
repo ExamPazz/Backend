@@ -4,6 +4,7 @@ use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\ExamDetailController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\LoginController;
+use App\Http\Controllers\OTPController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\ResetPasswordController;
 use App\Http\Controllers\UserProfileController;
@@ -39,6 +40,7 @@ Route::group(
         Route::post('password/reset/code/verify', [ResetPasswordController::class, 'verifyOtp']);
         Route::post('password/reset', [ResetPasswordController::class, 'reset']);
         Route::post('password/reset/code/resend', [ResetPasswordController::class, 'resendOtp']);
+        Route::post('code/send/whatsapp', [OTPController::class, 'sendViaWhatsApp']);
         Route::post('auth/google', [GoogleAuthController::class, 'store']);
 
         Route::post('/csv', [CsvImportController::class, 'importCsv']);

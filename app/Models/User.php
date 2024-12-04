@@ -59,6 +59,11 @@ class User extends Authenticatable
         return $this->hasOne(UserProfile::class);
     }
 
+    public function otp()
+    {
+        return $this->hasOne(Otp::class);
+    }
+
 
     protected static function boot()
     {
