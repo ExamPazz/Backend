@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\SubscriptionPlanController;
 use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\ExamDetailController;
 use App\Http\Controllers\GoogleAuthController;
@@ -44,6 +45,13 @@ Route::group(
         Route::post('auth/google', [GoogleAuthController::class, 'store']);
 
         Route::post('/csv', [CsvImportController::class, 'importCsv']);
+
+        Route::group(['prefix' => 'subscription-plan'], function () {
+            Route::post('store', [SubscriptionPlanController::class, 'store']);
+            Route::get('{uuid}/show', [SubscriptionPlanController::class, 'show']);
+            Route::patch('{uuid}/update', [SubscriptionPlanController::class, 'update']);
+            Route::delete('{uuid}/delete', [SubscriptionPlanController::class, 'delete']);
+        });
 
 
         Route::middleware('auth:sanctum')->group(function () {
