@@ -11,4 +11,14 @@ class MockExamQuestion extends Model
 
     protected $guarded = [];
 
+    public function mockExam()
+    {
+        return $this->belongsTo(MockExam::class);
+    }
+
+    public function question()
+    {
+        return $this->belongsTo(Question::class);
+    }
+
 }

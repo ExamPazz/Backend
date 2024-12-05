@@ -58,6 +58,10 @@ Route::group(
             Route::resource('exam-details', ExamDetailController::class)->except(['index']);
             Route::get('/user/profile', [UserProfileController::class, 'getAuthenticatedUser']);
             Route::put('/user/profile', [UserProfileController::class, 'updateUser']);
-            Route::post('/mock/exam', [MockExamController::class, 'generateMockExam']);
+            Route::post('/mock-exam', [MockExamController::class, 'generateMockExam']);
+            Route::post('/mock-exam/answers', [MockExamController::class, 'storeUserAnswer']);
+            Route::post('/mock-exam/{mockExamId}/calculate', [MockExamController::class, 'calculateScore']);
+            Route::post('/mock-exam/{mockExamId}/finalize', [MockExamController::class, 'finalizeExam']);
+            Route::get('/mock-exam/{mockExamId}/details', [MockExamController::class, 'getMockExamDetails']);
         });
     });
