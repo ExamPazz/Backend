@@ -20,6 +20,10 @@ class RegistrationController extends Controller
 
     public function register(RegistrationRequest $request)
     {
+        if ($request->input('agreed_to_terms_of_use') !== true)
+        {
+            return ApiResponse::failure("You must accept terms of use");
+        }
         $user = $this->userRepository->storeUser($request);
 
         if ($user)

@@ -28,7 +28,7 @@ class RegistrationRequest extends FormRequest
             'region' => ['nullable', 'string'],
             'city' => ['nullable', 'string'],
             'age' => ['nullable', 'numeric'],
-            'agreed_to_terms_of_use' => ['required', 'boolean', 'in:true']
+            'agreed_to_terms_of_use' => ['required', 'boolean']
         ];
     }
 }
