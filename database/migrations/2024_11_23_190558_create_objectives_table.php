@@ -12,7 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('objectives', function (Blueprint $table) {
-            $table->string('id')->primary(); // Roman numerals i-v
+            $table->id();
+            $table->string('unique_id'); // Roman numerals i-v
             $table->text('body');
             $table->timestamps();
         });
