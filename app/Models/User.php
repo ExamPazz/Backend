@@ -77,9 +77,5 @@ class User extends Authenticatable
         self::creating(function ($model) {
             $model->uuid = Str::orderedUuid();
         });
-
-        self::created(function ($model) {
-            $model->userProfile()->create([]);
-        });
     }
 }
