@@ -13,8 +13,9 @@ return new class extends Migration
     {
         Schema::create('objectives', function (Blueprint $table) {
             $table->id();
-            $table->string('unique_id'); // Roman numerals i-v
-            $table->text('body');
+            $table->foreignId('topic_id')->constrained('topics');
+            $table->string('body')->nullable();
+            $table->string('code');
             $table->timestamps();
         });
     }
