@@ -34,6 +34,6 @@ class RegistrationController extends Controller
         //        'user' => $user
         //     ]);
         // }
-        return ApiResponse::failure('Account Registration Failed');
+        return ApiResponse::success('Account Registration Successful');
     }
 }
