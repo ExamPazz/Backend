@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('sections', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('subject_id')->constrained('subjects');
+            // $table->foreignId('subject_id')->constrained('subjects');
             $table->string('body')->nullable();
             $table->string('code');
             $table->timestamps();

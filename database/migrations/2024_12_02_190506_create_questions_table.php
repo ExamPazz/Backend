@@ -22,10 +22,10 @@ return new class extends Migration
             $table->text('option_d');
             $table->char('correct_option', 1);
             $table->text('solution');
-            $table->string('section_id')->constrained('sections');
-            $table->string('chapter_id')->constrained('chapters');
-            $table->foreignId('topic_id')->constrained('topics'); // FK to topics
-            $table->foreignId('objective_id')->constrained('objectives'); // FK to objectives
+            // $table->string('section_id')->constrained('sections');
+            // $table->string('chapter_id')->constrained('chapters');
+            // $table->foreignId('topic_id')->constrained('topics'); // FK to topics
+            // $table->foreignId('objective_id')->constrained('objectives'); // FK to objectives
             $table->timestamps();
         });
     }
