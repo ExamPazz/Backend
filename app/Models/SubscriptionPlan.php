@@ -21,6 +21,10 @@ class SubscriptionPlan extends Model
         'allowed_number_of_attempts'
     ];
 
+    protected $casts = [
+        'allowed_subjects_ids' => 'json'
+    ];
+
     public function subscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class);

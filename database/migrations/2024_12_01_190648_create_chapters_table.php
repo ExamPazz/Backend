@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('chapters', function (Blueprint $table) {
-            $table->string('id')->primary(); // Roman numerals i-v
+            $table->id();
+            $table->string('code'); // Roman numerals i-v
+            $table->foreignId('subject_id')->nullable();
             $table->text('body');
             $table->timestamps();
         });

@@ -11,9 +11,9 @@ class Section extends Model
 
     protected $guarded = [];
 
-    protected $primaryKey = 'id';
-    public $incrementing = false;
-    protected $keyType = 'string';
+//    protected $primaryKey = 'id';
+//    public $incrementing = false;
+//    protected $keyType = 'string';
 
     public function questions()
     {
