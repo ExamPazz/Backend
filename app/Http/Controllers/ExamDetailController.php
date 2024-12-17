@@ -46,8 +46,10 @@ class ExamDetailController extends Controller
         if (! $examDetail){
             return ApiResponse::failure('Exam data not found');
         }
-        $updatedDetail = $this->examDetailService->update($examDetail, $request->validated());
-        return ApiResponse::success('Exam details updated successfully', [
+        $validatedData = $request->validated();
+
+        $updatedDetail = $this->examDetailService->update($examDetail, $validatedData);
+            return ApiResponse::success('Exam details updated successfully', [
             'data' => $updatedDetail
          ]);
     }
