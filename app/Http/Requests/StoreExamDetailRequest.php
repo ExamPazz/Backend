@@ -31,7 +31,6 @@ class StoreExamDetailRequest extends FormRequest
             'previous_score' => 'nullable|integer|min:0|max:400',
             'target_score' => 'required|integer|min:0|max:400',
             'subject_combinations' => 'required|array|min:4|max:4',
-            'weak_areas' => 'nullable|array',
         ];
     }
 }

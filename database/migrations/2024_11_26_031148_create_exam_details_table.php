@@ -21,6 +21,7 @@ return new class extends Migration
             $table->integer('previous_score')->nullable();
             $table->integer('target_score')->nullable();
             $table->json('subject_combinations');
+            $table->softDeletes(); 
             $table->timestamps();
         });
     }

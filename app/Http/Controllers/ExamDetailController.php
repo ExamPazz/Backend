@@ -55,10 +55,11 @@ class ExamDetailController extends Controller
     public function destroy($id)
     {
         $examDetail = ExamDetail::where('id', $id)->where('user_id', Auth::id())->first();
-        if (! $examDetail){
+        if (! $examDetail) {
             return ApiResponse::failure('Exam data not found');
         }
-        $this->examDetailService->delete($examDetail);
+
+        $examDetail->delete();
         return ApiResponse::success('Exam details deleted successfully');
     }
 }
