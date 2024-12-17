@@ -57,12 +57,12 @@ class LoginRequest extends FormRequest
             return ApiResponse::failure('Account is inactive, please contact Administrator', statusCode: 403);
         }
 
-        if (is_null($user->email_verified_at)) {
-            $otpAction = new OtpHelper();
-            $response = $otpAction->generateOtp($user);
-            event(new NewUserRegistrationEvent($user, $response['code']));
-            return ApiResponse::failure("Your email is not verified!. Verification code has been sent to your email", statusCode: 401);
-        }
+        // if (is_null($user->email_verified_at)) {
+        //     $otpAction = new OtpHelper();
+        //     $response = $otpAction->generateOtp($user);
+        //     event(new NewUserRegistrationEvent($user, $response['code']));
+        //     return ApiResponse::failure("Your email is not verified!. Verification code has been sent to your email", statusCode: 401);
+        // }
 
         RateLimiter::clear($this->throttleKey());
 

@@ -26,14 +26,14 @@ class RegistrationController extends Controller
         }
         $user = $this->userRepository->storeUser($request);
 
-        if ($user)
-        {
-            $otp = $this->otpHelper->generateOtp($user, 10);
-            event(new NewUserRegistrationEvent($user, $otp['code']));
-            return ApiResponse::success('Account Registration Successful', [
-               'user' => $user
-            ]);
-        }
+        // if ($user)
+        // {
+        //     $otp = $this->otpHelper->generateOtp($user, 10);
+        //     // event(new NewUserRegistrationEvent($user, $otp['code']));
+        //     return ApiResponse::success('Account Registration Successful', [
+        //        'user' => $user
+        //     ]);
+        // }
         return ApiResponse::failure('Account Registration Failed');
     }
 }
