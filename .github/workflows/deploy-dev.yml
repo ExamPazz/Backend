@@ -31,6 +31,20 @@ jobs:
     - name: Build NPM Assets
       run: npm run build
 
+
+    - name: Run Remote/Artisan Commands
+      uses: appleboy/ssh-action@v1.2.0
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          sudo rm -rf /var/www/html/exampazz
+          sudo mkdir /var/www/html/exampazz
+          sudo chown -R www-data /var/www/html/exampazz
+          sudo chmod -R 755 /var/www/html/exampazz/storage
+          sudo cp ~/exampazz/.env /var/www/html/exampazz/
+
     - name: Synchronize Files To Server
       uses: easingthemes/ssh-deploy@v2.1.5
       env:
@@ -48,10 +62,9 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
           cd /var/www/html/exampazz
-          php artisan migrate --force
+          php artisan key:generate
+          php artisan migrate
           php artisan config:cache
           php artisan event:cache
           php artisan route:cache
-          php artisan view:cache
-
-
+          php artisan view:cache
