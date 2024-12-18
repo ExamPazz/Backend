@@ -41,7 +41,7 @@ jobs:
         script: |
           sudo rm -rf /var/www/html/exampazz
           sudo mkdir /var/www/html/exampazz
-          sudo chown -R www-data /var/www/html/exampazz
+          sudo chown -R $USER:www-data /var/www/html/exampazz
           sudo chmod -R 755 /var/www/html/exampazz/storage
           sudo cp ~/exampazz/.env /var/www/html/exampazz/
 
