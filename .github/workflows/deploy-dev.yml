@@ -62,9 +62,4 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
           cd /var/www/html/exampazz
-          php artisan key:generate;
-          php artisan migrate;
-          php artisan config:cache;
-          php artisan event:cache;
-          php artisan route:cache;
-          php artisan view:cache;
+          php artisan key:generate && php artisan migrate && php artisan config:cache && php artisan event:cache && php artisan route:cache && php artisan view:cache
