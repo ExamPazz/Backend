@@ -42,7 +42,6 @@ jobs:
           sudo rm -rf /var/www/html/exampazz
           sudo mkdir /var/www/html/exampazz
           sudo chown -R $USER:www-data /var/www/html/exampazz
-          sudo chmod -R 755 /var/www/html/exampazz/storage
           cp ~/exampazz/.env /var/www/html/exampazz/
 
     - name: Synchronize Files To Server
@@ -62,5 +61,6 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
           cd /var/www/html/exampazz
-          php artisan key:generate && php artisan migrate && php artisan config:cache && php artisan event:cache && php artisan route:cache;
+          sudo chmod -R 755 /var/www/html/exampazz/storage
+          php artisan key:generate && php artisan migrate && php artisan config:cache && php artisan view:cache && php artisan route:cache;
           
