@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\MockExam;
 use App\Models\MockExamQuestion;
+use App\Models\Subject;
 use App\Models\UserExamAnswer;
 use App\Models\Question;
 use Carbon\Carbon;
@@ -13,7 +14,7 @@ class MockExamService
     /**
      * Generate a mock exam for the user.
      *
-     * @param \App\Models\User $user
+     * @param  \App\Models\User  $user
      * @return array
      */
     public function generateMockExam($user)
@@ -24,29 +25,40 @@ class MockExamService
             throw new \InvalidArgumentException('User must select exactly 4 subjects.');
         }
 
-        $subjects = collect(json_decode($examDetail->subject_combinations, true));
+        $subjects_ids = $examDetail->subject_combinations;
 
-        if ($subjects->count() !== 4) {
+        $subjects_models = Subject::query()
+            ->whereIn('id', $subjects_ids)->get(['id', 'name']);
+
+
+//        $subjects = collect($subjects_ids);
+
+
+        if (count($subjects_ids) !== 4) {
             throw new \InvalidArgumentException('User must select exactly 4 subjects.');
         }
 
-        $selectedQuestions = collect();
-
+        $selectedQuestions = [];
         // Fetch 40 questions for each subject
-        foreach ($subjects as $subjectId) {
-            $questions = Question::whereHas('section', function ($query) use ($subjectId) {
-                $query->where('subject_id', $subjectId);
-            })
-            ->inRandomOrder()
-            ->limit(40)
-            ->get();
+        foreach ($subjects_ids as $subjectId) {
+            $questions = Question::query()
+                ->select(['id', 'year', 'question', 'image_url', 'subject_id', 'topic_id', 'objective_id'])
+                ->with(['questionOptions' => function ($query) {
+                    $query->select(['id', 'question_id', 'value'])->inRandomOrder();
+                }, 'subject', 'topic', 'objective'])
+                ->where('subject_id', $subjectId)
+                ->inRandomOrder()
+                ->limit(40)
+                ->get();
 
-            $questions->each(function ($question) use ($subjectId) {
-                $question->subject_id = $subjectId;
-            });
+//            $questions->each(function ($question) use ($subjectId) {
+//                $question->subject_id = $subjectId;
+//            });
 
-            $selectedQuestions = $selectedQuestions->merge($questions);
+            $selectedQuestions[] = $questions;
         }
+
+//        return $selectedQuestions;
 
         $mockExam = MockExam::create([
             'user_id' => $user->id,
@@ -58,28 +70,35 @@ class MockExamService
         foreach ($selectedQuestions as $question) {
             MockExamQuestion::create([
                 'mock_exam_id' => $mockExam->id,
-                'question_id' => $question->id,
-                'subject_id' => $question->subject_id,
+                'question_id' => $question->toArray()[0]['id'],
+                'subject_id' => $question->toArray()[0]['subject_id'],
             ]);
         }
 
         // Return the generated exam details
         return [
-            'mock_exam_id' => $mockExam->id,
-            'questions' => $selectedQuestions->map(function ($question) {
-                return [
-                    'id' => $question->id,
-                    'question' => $question->question,
-                    'options' => $question->questionOptions->mapWithKeys(function ($option) {
-                        return [$option->value => $option->is_correct];
-                    }),
-                    'image_url' => $question->image_url,
-                    'subject_id' => $question->subject_id, 
-                ];
-            }),
+          'subjects' => $subjects_models,
+          'questions' => $selectedQuestions
         ];
-    }
 
+//        return [
+//            'subjects' => $subjects_models,
+//            'mock_exam_id' => $mockExam->id,
+//            'questions' => $selectedQuestions->map(function ($question) {
+//                return [
+//                    'id' => $question->id,
+//                    'question' => $question->question,
+//                    'options' => $question->questionOptions()->inRandomOrder()->get(['id', 'value', 'question_id']),
+//
+////                        ->mapWithKeys(function ($option) {
+////                        return [$option->value => $option->is_correct];
+////                    }),
+//                    'image_url' => $question->image_url,
+//                    'subject_id' => $question->subject_id
+//                ];
+//            }),
+//        ];
+    }
 
 
     public function storeUserAnswer($user, $data)

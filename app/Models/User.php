@@ -65,9 +65,9 @@ class User extends Authenticatable
         return $this->hasOne(Otp::class);
     }
 
-    public function subscriptions(): HasMany
+    public function subscription(): HasOne
     {
-        return $this->hasMany(Subscription::class);
+        return $this->hasOne(Subscription::class);
     }
 
 

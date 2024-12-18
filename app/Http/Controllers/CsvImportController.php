@@ -112,6 +112,7 @@ class CsvImportController extends Controller
 
                 // Link to related records
                 $question->section_id = $section->id;
+                $question->subject_id = $subject->id;
                 $question->chapter_id = $chapter->id;
                 $question->topic_id = $topic->id;
                 $question->objective_id = $objective->id;

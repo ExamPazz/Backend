@@ -8,11 +8,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ExamDetail extends Model
 {
-    use HasFactory, SoftDeletes; 
-    
+    use HasFactory, SoftDeletes;
+
     protected $guarded = [];
 
-    // protected $casts = [
-    //     'subject_combinations' => 'array',
-    // ];
+     protected $casts = [
+         'subject_combinations' => 'array',
+     ];
 }

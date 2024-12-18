@@ -13,8 +13,9 @@ return new class extends Migration
     {
         Schema::create('mock_exam_questions', function (Blueprint $table) {
             $table->id();
-            $table->string('mock_exam_id');
-            $table->string('question_id');
+            $table->foreignId('subject_id')->constrained('subjects');
+            $table->foreignId('mock_exam_id');
+            $table->foreignId('question_id');
             $table->timestamps();
         });
     }

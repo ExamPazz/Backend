@@ -68,7 +68,7 @@ class LoginRequest extends FormRequest
 
         $access_token = $user->createToken('auth_token')->plainTextToken;
         return ApiResponse::success('Login Successful', [
-            'user' => $user,
+            'user' => $user->load('subscription'),
             'access_token' => $access_token
         ]);
     }
