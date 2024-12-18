@@ -31,9 +31,6 @@ class MockExamService
             ->whereIn('id', $subjects_ids)->get(['id', 'name']);
 
 
-//        $subjects = collect($subjects_ids);
-
-
         if (count($subjects_ids) !== 4) {
             throw new \InvalidArgumentException('User must select exactly 4 subjects.');
         }
@@ -51,14 +48,8 @@ class MockExamService
                 ->limit(40)
                 ->get();
 
-//            $questions->each(function ($question) use ($subjectId) {
-//                $question->subject_id = $subjectId;
-//            });
-
             $selectedQuestions[] = $questions;
         }
-
-//        return $selectedQuestions;
 
         $mockExam = MockExam::create([
             'user_id' => $user->id,
@@ -80,31 +71,13 @@ class MockExamService
           'subjects' => $subjects_models,
           'questions' => $selectedQuestions
         ];
-
-//        return [
-//            'subjects' => $subjects_models,
-//            'mock_exam_id' => $mockExam->id,
-//            'questions' => $selectedQuestions->map(function ($question) {
-//                return [
-//                    'id' => $question->id,
-//                    'question' => $question->question,
-//                    'options' => $question->questionOptions()->inRandomOrder()->get(['id', 'value', 'question_id']),
-//
-////                        ->mapWithKeys(function ($option) {
-////                        return [$option->value => $option->is_correct];
-////                    }),
-//                    'image_url' => $question->image_url,
-//                    'subject_id' => $question->subject_id
-//                ];
-//            }),
-//        ];
     }
 
 
     public function storeUserAnswer($user, $data)
     {
         $question = Question::find($data['question_id']);
-        $isCorrect = $data['selected_option'] === $question->correct_option;
+        $isCorrect = $data['selected_option'] === $question->questionOptions->is_correct;
 
         UserExamAnswer::updateOrCreate(
             [
@@ -181,14 +154,9 @@ class MockExamService
             return [
                 'id' => $question->id,
                 'question' => $question->question,
-                'options' => [
-                    'a' => $question->option_a,
-                    'b' => $question->option_b,
-                    'c' => $question->option_c,
-                    'd' => $question->option_d,
-                ],
+                'options' => $question->questionOptions,
                 'image_url' => $question->image_url,
-                'correct_option' => $question->correct_option,
+                'correct_option' => $question->questionOptions->is_correct,
                 'solution' => $question->solution,
                 'user_answer' => $userAnswer?->selected_option,
                 'is_correct' => $userAnswer?->is_correct,
