@@ -9,6 +9,9 @@ class ExamDetailService
     public function store(array $data)
     {
         $data['user_id'] = auth()->id(); 
+        if (!is_array($data['subject_combinations'])) {
+            throw new \InvalidArgumentException('Subject combinations must be an array of subject IDs.');
+        }
         return ExamDetail::create($data);
     }
 

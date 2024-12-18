@@ -12,7 +12,7 @@ class ExamDetail extends Model
     
     protected $guarded = [];
 
-    protected $casts = [
-        'subject_combinations' => 'array',
-    ];
+    // protected $casts = [
+    //     'subject_combinations' => 'array',
+    // ];
 }

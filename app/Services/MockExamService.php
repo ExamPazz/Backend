@@ -18,31 +18,34 @@ class MockExamService
      */
     public function generateMockExam($user)
     {
-        $distribution = [
-            'i' => 15,
-            'ii' => 15,
-            'iii' => 10,
-        ];
+        $examDetail = $user->latestExamDetail;
+
+        if (!$examDetail || empty($examDetail->subject_combinations)) {
+            throw new \InvalidArgumentException('User must select exactly 4 subjects.');
+        }
+
+        $subjects = collect(json_decode($examDetail->subject_combinations, true));
+
+        if ($subjects->count() !== 4) {
+            throw new \InvalidArgumentException('User must select exactly 4 subjects.');
+        }
 
         $selectedQuestions = collect();
 
-        foreach ($distribution as $sectionId => $count) {
-            $questions = Question::where('section_id', $sectionId)
-                ->inRandomOrder()
-                ->limit($count)
-                ->get();
+        // Fetch 40 questions for each subject
+        foreach ($subjects as $subjectId) {
+            $questions = Question::whereHas('section', function ($query) use ($subjectId) {
+                $query->where('subject_id', $subjectId);
+            })
+            ->inRandomOrder()
+            ->limit(40)
+            ->get();
+
+            $questions->each(function ($question) use ($subjectId) {
+                $question->subject_id = $subjectId;
+            });
 
             $selectedQuestions = $selectedQuestions->merge($questions);
-        }
-
-        $remaining = 40 - $selectedQuestions->count();
-        if ($remaining > 0) {
-            $extraQuestions = Question::whereNotIn('id', $selectedQuestions->pluck('id'))
-                ->inRandomOrder()
-                ->limit($remaining)
-                ->get();
-
-            $selectedQuestions = $selectedQuestions->merge($extraQuestions);
         }
 
         $mockExam = MockExam::create([
@@ -51,30 +54,33 @@ class MockExamService
             'end_time' => Carbon::now()->addMinutes(90), // 1 hour 30 minutes
         ]);
 
+        // Attach questions to the mock exam
         foreach ($selectedQuestions as $question) {
             MockExamQuestion::create([
                 'mock_exam_id' => $mockExam->id,
                 'question_id' => $question->id,
+                'subject_id' => $question->subject_id,
             ]);
         }
 
+        // Return the generated exam details
         return [
             'mock_exam_id' => $mockExam->id,
             'questions' => $selectedQuestions->map(function ($question) {
                 return [
                     'id' => $question->id,
                     'question' => $question->question,
-                    'options' => [
-                        'a' => $question->option_a,
-                        'b' => $question->option_b,
-                        'c' => $question->option_c,
-                        'd' => $question->option_d,
-                    ],
+                    'options' => $question->questionOptions->mapWithKeys(function ($option) {
+                        return [$option->value => $option->is_correct];
+                    }),
                     'image_url' => $question->image_url,
+                    'subject_id' => $question->subject_id, 
                 ];
             }),
         ];
     }
+
+
 
     public function storeUserAnswer($user, $data)
     {

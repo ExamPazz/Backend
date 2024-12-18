@@ -78,4 +78,22 @@ class User extends Authenticatable
             $model->uuid = Str::orderedUuid();
         });
     }
+
+    public function examDetails(): HasMany
+    {
+        return $this->hasMany(ExamDetail::class, 'user_id');
+    }
+
+    // Retrieve the latest subject combination
+    public function latestSubjectCombination()
+    {
+        return $this->hasOne(ExamDetail::class, 'user_id')->latestOfMany();
+    }
+
+    public function latestExamDetail()
+{
+    return $this->hasOne(ExamDetail::class)->latestOfMany();
+}
+
+
 }

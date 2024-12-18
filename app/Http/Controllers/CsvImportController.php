@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\QuestionOption;
 use App\Models\Subject;
 use Illuminate\Http\Request;
 use App\Models\Section;
@@ -21,8 +20,6 @@ class CsvImportController extends Controller
         ]);
         $filePath = $request->file('question_csv');
         $subject_name = $request->input('subject_name');
-        // Define file  path (update this based on actual path or input)
-//        $filePath = 'C:\\Users\\olanm\\Downloads\\2017 Data Bank.csv';
 
         // Open and read the CSV file
         if (!file_exists($filePath) || !is_readable($filePath)) {
