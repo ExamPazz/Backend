@@ -77,7 +77,8 @@ class MockExamService
     public function storeUserAnswer($user, $data)
     {
         $question = Question::find($data['question_id']);
-        $isCorrect = $data['selected_option'] === $question->questionOptions->is_correct;
+        $selectedOption = json_encode($data['selected_option']);
+        $isCorrect = $selectedOption === $question->questionOptions->pluck('value')->first();
 
         UserExamAnswer::updateOrCreate(
             [
@@ -156,7 +157,7 @@ class MockExamService
                 'question' => $question->question,
                 'options' => $question->questionOptions,
                 'image_url' => $question->image_url,
-                'correct_option' => $question->questionOptions->is_correct,
+                'correct_option' => $question->questionOptions->pluck('value'),
                 'solution' => $question->solution,
                 'user_answer' => $userAnswer?->selected_option,
                 'is_correct' => $userAnswer?->is_correct,

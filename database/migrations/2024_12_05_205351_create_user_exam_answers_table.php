@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('mock_exam_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('question_id')->constrained()->onDelete('cascade');
-            $table->char('selected_option', 1);
+            $table->string('selected_option');
             $table->boolean('is_correct')->default(false);
             $table->timestamps();
         });
