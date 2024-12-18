@@ -43,7 +43,7 @@ jobs:
           sudo mkdir /var/www/html/exampazz
           sudo chown -R $USER:www-data /var/www/html/exampazz
           sudo chmod -R 755 /var/www/html/exampazz/storage
-          sudo cp ~/exampazz/.env /var/www/html/exampazz/
+          cp ~/exampazz/.env /var/www/html/exampazz/
 
     - name: Synchronize Files To Server
       uses: easingthemes/ssh-deploy@v2.1.5
