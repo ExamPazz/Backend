@@ -24,7 +24,7 @@ class StoreUserAnswerRequest extends FormRequest
         return [
             'mock_exam_id' => 'required|exists:mock_exams,id',
             'question_id' => 'required|exists:questions,id',
-            'selected_option' => 'required|in:a,b,c,d',
+            'selected_option' => 'exists:question_options,value'
         ];
     }
 }
