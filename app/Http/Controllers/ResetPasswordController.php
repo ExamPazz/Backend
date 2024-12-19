@@ -48,7 +48,7 @@ class ResetPasswordController
         ]);
 
         $user = User::query()->where('email', $validated['email'])->first();
-        $otp = $service->generateOtp($user);
+        $otp = $service->generateOtp($user, 20);
 
         event(new ResetPasswordEvent($user, $otp['code']));
 
@@ -80,7 +80,7 @@ class ResetPasswordController
 
         $otpAction = new OtpHelper();
         $user = User::query()->where('email', $request->email)->first();
-        $response = $otpAction->generateOtp($user);
+        $response = $otpAction->generateOtp($user, 20);
 
         if (!$response) {
             return ApiResponse::failure('An error occurred with resending otp');

@@ -39,7 +39,7 @@ class ResetPasswordNotification extends Notification
             ->greeting("Hello! ")
             ->line("Your OTP code for password reset is: {$this->otp}.")
             ->line('Please use this code to verify you made this request.')
-            ->line('The OTP is valid for 1 minute.')
+            ->line('The OTP is valid for 20 minutes.')
             ->line('If you did not request this code, please ignore this email.')
             ->line('Thank you for using our application!');
     }

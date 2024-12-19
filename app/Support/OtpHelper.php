@@ -12,7 +12,7 @@ use Random\RandomException;
 
 class OtpHelper
 {
-    public function generateOtp(User|Model $user, int $expires_at = 1, bool $generate_token = false): array
+    public function generateOtp(User|Model $user, int $expires_at = 20, bool $generate_token = false): array
     {
         $otp = random_int(0, 999999);
         $code = str_pad($otp, 6, '0', STR_PAD_LEFT);

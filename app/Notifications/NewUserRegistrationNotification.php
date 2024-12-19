@@ -39,7 +39,7 @@ class NewUserRegistrationNotification extends Notification
             ->greeting("Hello! ")
             ->line("Your OTP code for email verification is: {$this->otp}.")
             ->line('Please use this code to verify your email address.')
-            ->line('The OTP is valid for 10 minute.')
+            ->line('The OTP is valid for 20 minutes.')
             ->line('If you did not request this code, please ignore this email.')
             ->line('Thank you for using our application!');
     }
