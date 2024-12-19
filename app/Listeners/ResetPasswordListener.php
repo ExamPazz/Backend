@@ -7,7 +7,7 @@ use App\Notifications\ResetPasswordNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 
-class ResetPasswordListener
+class ResetPasswordListener implements ShouldQueue
 {
     /**
      * Create the event listener.

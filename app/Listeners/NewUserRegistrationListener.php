@@ -7,7 +7,7 @@ use App\Notifications\NewUserRegistrationNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 
-class NewUserRegistrationListener
+class NewUserRegistrationListener implements ShouldQueue
 {
     /**
      * Create the event listener.
