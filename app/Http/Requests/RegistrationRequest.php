@@ -19,16 +19,14 @@ class RegistrationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'first_name' => ['required', 'string', 'alpha'],
-            'last_name' => ['required', 'string', 'alpha'],
+            'full_name' => ['required', 'string', 'alpha'],
             'phone_number' => ['required', 'string', 'unique:user_profiles,phone_number'],
             'email' => ['required', 'email', 'unique:users,email'],
-            'password' => ['required', 'confirmed', new StrongPassword()],
+            'password' => ['required', new StrongPassword()],
             'nationality' => ['nullable', 'string'],
             'region' => ['nullable', 'string'],
             'city' => ['nullable', 'string'],
             'age' => ['nullable', 'numeric'],
-            'agreed_to_terms_of_use' => ['required', 'boolean']
         ];
     }
 }
