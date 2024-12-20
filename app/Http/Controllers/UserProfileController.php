@@ -22,7 +22,7 @@ class UserProfileController extends Controller
 
         $request->validated();
 
-        $user->update($request->only(['first_name', 'last_name', 'email']));
+        $user->update($request->only(['full_name', 'email']));
         $user->userProfile()->update($request->only(['phone_number', 'region', 'city', 'nationality', 'age']));
 
         return ApiResponse::success('User data updated successfully', new UserResource($user));
