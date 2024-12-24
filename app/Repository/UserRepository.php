@@ -13,8 +13,7 @@ class UserRepository
     {
         return DB::transaction(function () use ($request) {
             $user = User::query()->create([
-                'first_name' => $request->input('first_name'),
-                'last_name' => $request->input('last_name'),
+                'full_name' => $request->input('full_name'),
                 'email' => $request->input('email'),
                 'password' => bcrypt($request->input('password'))
             ]);

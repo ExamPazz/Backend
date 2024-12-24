@@ -103,7 +103,7 @@ class MockExamService
 
         $totalQuestions = $userAnswers->count();
         $correctAnswers = $userAnswers->where('is_correct', true)->count();
-        $score = $totalQuestions > 0 ? ($correctAnswers / $totalQuestions) * 100 : 0;
+        $score = $totalQuestions > 0 ? ($correctAnswers / $totalQuestions) * 400 : 0;
 
         return [
             'total_questions' => $totalQuestions,
