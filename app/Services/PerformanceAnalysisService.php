@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Models\MockExam;
 use App\Models\UserExamAnswer;
 
-class PerfomanceAnalysisService
+class PerformanceAnalysisService
 {
     public function getUserExamStatistics($user)
     {
@@ -38,8 +38,8 @@ class PerfomanceAnalysisService
             }
         }
 
-        $averageScore = $mockExams->count() > 0 
-            ? $totalExamScores / $mockExams->count() 
+        $averageScore = $mockExams->count() > 0
+            ? $totalExamScores / $mockExams->count()
             : 0;
 
         $skippedQuestions = $totalQuestions - $totalAnsweredQuestions;
