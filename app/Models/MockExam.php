@@ -11,6 +11,12 @@ class MockExam extends Model
 
     protected $guarded = [];
 
+    protected $casts = [
+        'start_time' => 'datetime',
+        'end_time' => 'datetime',
+    ];
+
+
     public function mockExamQuestions()
     {
         return $this->hasMany(MockExamQuestion::class);

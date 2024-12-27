@@ -12,6 +12,7 @@ use App\Http\Controllers\UserProfileController;
 use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\MockExamController;
 use App\Http\Controllers\PerfomanceAnalysisController;
+use App\Http\Controllers\PerformanceAnalysisController;
 use App\Http\Controllers\SubjectController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -66,6 +67,7 @@ Route::group(
             Route::post('/mock-exam/{mockExamId}/finalize', [MockExamController::class, 'finalizeExam']);
             Route::get('/mock-exam/{mockExamId}/details', [MockExamController::class, 'getMockExamDetails']);
             Route::resource('subjects', SubjectController::class);
-            Route::get('/user/analysis', [PerfomanceAnalysisController::class, 'getUserExamAnalysis']);
+            Route::get('/user/analysis', [PerformanceAnalysisController::class, 'getUserExamAnalysis']);
+            Route::get('/user/mock-exams', [PerformanceAnalysisController::class, 'getUserMockExams']);
         });
     });
