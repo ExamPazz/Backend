@@ -43,7 +43,8 @@ class Kernel extends HttpKernel
             \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \App\Http\Middleware\ForceJsonResponse::class,
-            \App\Http\Middleware\CheckAccountStatus::class
+            \App\Http\Middleware\CheckAccountStatus::class,
+            \App\Http\Middleware\CorsMiddleware::class
         ],
     ];
 
