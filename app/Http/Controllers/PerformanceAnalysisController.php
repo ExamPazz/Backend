@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Services\PerformanceAnalysisService;
 use App\Support\ApiResponse;
@@ -16,7 +17,7 @@ class PerformanceAnalysisController extends Controller
         $this->performanceAnalysisService = $performanceAnalysisService;
     }
 
-    public function getUserExamAnalysis(Request $request)
+    public function getUserExamAnalysis(Request $request): JsonResponse
     {
         $user = $request->user();
 
