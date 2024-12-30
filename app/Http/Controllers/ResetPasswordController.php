@@ -64,7 +64,7 @@ class ResetPasswordController
         $otp = $service->verifyEmailOtp($validated['otp'], $validated['email'], 'password');
 
         if (!$otp['status']) {
-            return ApiResponse::failure($otp['reason'], $otp['code']);
+            return ApiResponse::failure($otp['reason']);
         }
 
         return ApiResponse::success('Verification successful', [
