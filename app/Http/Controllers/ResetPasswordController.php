@@ -18,7 +18,7 @@ class ResetPasswordController
     public function reset(Request $request)
     {
         $request->validate([
-            'email' => ['required|email'],
+            'email' => ['required', 'email'],
             'password' => ['required', new StrongPassword(), 'confirmed'],
             'verification_token' => ['required']
         ]);
