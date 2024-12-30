@@ -18,60 +18,62 @@ class MockExamService
      * @return array
      */
     public function generateMockExam($user)
-    {
-        $examDetail = $user->latestExamDetail;
+{
+    $examDetail = $user->latestExamDetail;
 
-        if (!$examDetail || empty($examDetail->subject_combinations)) {
-            throw new \InvalidArgumentException('User must select exactly 4 subjects.');
-        }
-
-        $subjects_ids = $examDetail->subject_combinations;
-
-        $subjects_models = Subject::query()
-            ->whereIn('id', $subjects_ids)->get(['id', 'name']);
-
-
-        if (count($subjects_ids) !== 4) {
-            throw new \InvalidArgumentException('User must select exactly 4 subjects.');
-        }
-
-        $selectedQuestions = [];
-        // Fetch 40 questions for each subject
-        foreach ($subjects_ids as $subjectId) {
-            $questions = Question::query()
-                ->select(['id', 'year', 'question', 'image_url', 'subject_id', 'topic_id', 'objective_id'])
-                ->with(['questionOptions' => function ($query) {
-                    $query->select(['id', 'question_id', 'value'])->inRandomOrder();
-                }, 'subject', 'topic', 'objective'])
-                ->where('subject_id', $subjectId)
-                ->inRandomOrder()
-                ->limit(40)
-                ->get();
-
-            $selectedQuestions[] = $questions;
-        }
-
-        $mockExam = MockExam::create([
-            'user_id' => $user->id,
-            'start_time' => now(),
-            'end_time' => Carbon::now()->addMinutes(90), // 1 hour 30 minutes
-        ]);
-
-        // Attach questions to the mock exam
-        foreach ($selectedQuestions as $question) {
-            MockExamQuestion::create([
-                'mock_exam_id' => $mockExam->id,
-                'question_id' => $question->toArray()[0]['id'],
-                'subject_id' => $question->toArray()[0]['subject_id'],
-            ]);
-        }
-
-        // Return the generated exam details
-        return [
-          'subjects' => $subjects_models,
-          'questions' => $selectedQuestions
-        ];
+    if (!$examDetail || empty($examDetail->subject_combinations)) {
+        throw new \InvalidArgumentException('User must select exactly 4 subjects.');
     }
+
+    $subjects_ids = $examDetail->subject_combinations;
+
+    $subjects_models = Subject::query()
+        ->whereIn('id', $subjects_ids)->get(['id', 'name']);
+
+    if (count($subjects_ids) !== 4) {
+        throw new \InvalidArgumentException('User must select exactly 4 subjects.');
+    }
+
+    $selectedQuestions = [];
+    // Fetch questions for each subject
+    foreach ($subjects_ids as $subjectId) {
+        $questions = Question::query()
+            ->select(['id', 'year', 'question', 'image_url', 'subject_id', 'topic_id', 'objective_id'])
+            ->with(['questionOptions' => function ($query) {
+                $query->select(['id', 'question_id', 'value'])->inRandomOrder();
+            }, 'subject', 'topic', 'objective'])
+            ->where('subject_id', $subjectId)
+            ->inRandomOrder()
+            ->limit(50)
+            ->get();
+
+        if ($questions->isEmpty()) {
+            throw new \RuntimeException("No questions found for subject ID: {$subjectId}");
+        }
+
+        $selectedQuestions = array_merge($selectedQuestions, $questions->toArray());
+    }
+
+    $mockExam = MockExam::create([
+        'user_id' => $user->id,
+        'start_time' => now(),
+        'end_time' => now()->addMinutes(90), // 1 hour 30 minutes
+    ]);
+
+    foreach ($selectedQuestions as $question) {
+        MockExamQuestion::create([
+            'mock_exam_id' => $mockExam->id,
+            'question_id' => $question['id'],
+            'subject_id' => $question['subject_id'],
+        ]);
+    }
+
+    return [
+        'subjects' => $subjects_models,
+        'questions' => $selectedQuestions,
+    ];
+}
+
 
 
     public function storeUserAnswer($user, $data)
