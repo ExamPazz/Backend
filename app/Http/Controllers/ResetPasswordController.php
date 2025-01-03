@@ -27,7 +27,7 @@ class ResetPasswordController
             return ApiResponse::failure('Invalid token', statusCode: 404);
         }
         $status = Password::reset(
-            $request->only('email', 'password', 'password_confirmation', 'confirmation_token'),
+            $request->only('email', 'password', 'password_confirmation', 'verification_token'),
             function (User $user, string $password) {
                 $user->forceFill([
                     'password' => Hash::make($password)
