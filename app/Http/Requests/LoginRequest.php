@@ -66,9 +66,12 @@ class LoginRequest extends FormRequest
 
         RateLimiter::clear($this->throttleKey());
 
+        $hasExamDetail = $user->latestExamDetail()->exists();
+
         $access_token = $user->createToken('auth_token')->plainTextToken;
         return ApiResponse::success('Login Successful', [
             'user' => $user->load('subscription'),
+            'has_exam_detail' => $hasExamDetail,
             'access_token' => $access_token
         ]);
     }
