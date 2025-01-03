@@ -26,19 +26,20 @@ class ResetPasswordController
         if (!$otp) {
             return ApiResponse::failure('Invalid token', statusCode: 404);
         }
-        $status = Password::reset(
-            $request->only('email', 'password', 'password_confirmation'),
-            function (User $user, string $password) {
-                $user->forceFill([
-                    'password' => Hash::make($password)
-                ]);
-                $user->save();
-            }
-        );
 
-        return $status === Password::PASSWORD_RESET
-            ? ApiResponse::success("successful password reset")
-            : ApiResponse::failure(__($status));
+        $user = User::query()->firstWhere('email', $request->input('email'));
+
+        $user->password = Hash::make($request->input('password'));
+        $saved = $user->save();
+
+        if ($saved)
+        {
+            ApiResponse::success("successful password reset");
+        }
+
+        ApiResponse::failure("failed password reset");
+
+
     }
 
     public function forgotPassword(Request $request, OtpHelper $service)
