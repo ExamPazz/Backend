@@ -54,14 +54,14 @@ class MockExamService
         $selectedQuestions = array_merge($selectedQuestions, $questions->toArray());
     }
 
-    $mockExam = MockExam::create([
+    $mockExam = MockExam::query()->create([
         'user_id' => $user->id,
         'start_time' => now(),
         'end_time' => now()->addMinutes(90), // 1 hour 30 minutes
     ]);
 
     foreach ($selectedQuestions as $question) {
-        MockExamQuestion::create([
+        MockExamQuestion::query()->create([
             'mock_exam_id' => $mockExam->id,
             'question_id' => $question['id'],
             'subject_id' => $question['subject_id'],

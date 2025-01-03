@@ -13,15 +13,15 @@ return new class extends Migration
     {
         Schema::create('exam_details', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->enum('exam_name', ['JAMB', 'WAEC', 'NECO']);            
+            $table->foreignId('user_id')->index()->constrained()->onDelete('cascade');
+            $table->enum('exam_name', ['JAMB', 'WAEC', 'NECO']);
             $table->string('registration_number')->nullable();
             $table->boolean('has_written_before');
             $table->year('exam_year')->nullable();
             $table->integer('previous_score')->nullable();
             $table->integer('target_score')->nullable();
             $table->json('subject_combinations');
-            $table->softDeletes(); 
+            $table->softDeletes();
             $table->timestamps();
         });
     }

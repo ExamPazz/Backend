@@ -53,6 +53,14 @@ class OtpHelper
 
             $user->markEmailAsVerified();
         }
+
+        if ($reason === 'password')
+        {
+            $otpRecord->update([
+                'verification_token' => Str::random(32)
+            ]);
+        }
+
         $otpRecord->update(['is_used' => true]);
 
         return [

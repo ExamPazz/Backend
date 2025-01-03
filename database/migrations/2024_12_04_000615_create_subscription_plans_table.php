@@ -18,7 +18,7 @@ return new class extends Migration
             $table->decimal('price')->default(0);
             $table->json('allowed_subjects_ids')->nullable();
             $table->integer('allowed_number_of_questions')->nullable();
-            $table->integer('allowed_number_of_attempts')->nullable();
+            $table->integer('allowed_number_of_attempts')->index()->nullable();
             $table->timestamps();
         });
     }

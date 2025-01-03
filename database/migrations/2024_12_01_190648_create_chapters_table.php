@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('chapters', function (Blueprint $table) {
             $table->id();
             $table->string('code'); // Roman numerals i-v
-            $table->foreignId('subject_id')->nullable();
+            $table->foreignId('subject_id')->index()->nullable();
             $table->text('body');
             $table->timestamps();
         });

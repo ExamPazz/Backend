@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('subscriptions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('subscription_plan_id');
-            $table->foreignId('user_id');
+            $table->foreignId('subscription_plan_id')->index();
+            $table->foreignId('user_id')->index();
             $table->string('status')->default('active');
             $table->json('payment_provider_data')->nullable();
             $table->timestamps();
