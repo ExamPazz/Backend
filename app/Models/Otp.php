@@ -13,7 +13,7 @@ class Otp extends Model
         'user_id',
         'is_used',
         'code',
-        'confirmation_token',
+        'verification_token',
         'expires_at',
     ];
 
