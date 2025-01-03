@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('mock_exams', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id');
+            $table->foreignId('user_id')->index();
             $table->timestamps();
         });
     }

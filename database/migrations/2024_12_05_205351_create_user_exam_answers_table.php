@@ -13,9 +13,9 @@ return new class extends Migration
     {
         Schema::create('user_exam_answers', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('mock_exam_id')->constrained()->onDelete('cascade');
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('question_id')->constrained()->onDelete('cascade');
+            $table->foreignId('mock_exam_id')->index()->constrained()->onDelete('cascade');
+            $table->foreignId('user_id')->index()->constrained()->onDelete('cascade');
+            $table->foreignId('question_id')->index()->constrained()->onDelete('cascade');
             $table->string('selected_option');
             $table->boolean('is_correct')->default(false);
             $table->timestamps();

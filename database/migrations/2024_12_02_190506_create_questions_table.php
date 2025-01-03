@@ -16,11 +16,11 @@ return new class extends Migration {
             $table->text('question');
             $table->string('image_url')->nullable();
             $table->text('solution');
-            $table->foreignId('section_id')->constrained('sections');
-            $table->foreignId('subject_id')->constrained('subjects');
-            $table->foreignId('chapter_id')->constrained('chapters');
-            $table->foreignId('topic_id')->constrained('topics'); // FK to topics
-            $table->foreignId('objective_id')->constrained('objectives'); // FK to objectives
+            $table->foreignId('section_id')->index()->constrained('sections');
+            $table->foreignId('subject_id')->index()->constrained('subjects');
+            $table->foreignId('chapter_id')->index()->constrained('chapters');
+            $table->foreignId('topic_id')->index()->constrained('topics'); // FK to topics
+            $table->foreignId('objective_id')->index()->constrained('objectives'); // FK to objectives
             $table->timestamps();
         });
     }

@@ -12,8 +12,8 @@ return new class extends Migration {
     {
         Schema::create('topics', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('section_id')->nullable()->constrained('sections');
-            $table->foreignId('subject_id')->nullable()->constrained('subjects');
+            $table->foreignId('section_id')->nullable()->index()->constrained('sections');
+            $table->foreignId('subject_id')->nullable()->index()->constrained('subjects');
             $table->string('body')->nullable();
             $table->string('code');
             $table->timestamps();
