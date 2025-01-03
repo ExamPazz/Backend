@@ -90,16 +90,15 @@ class MockExamService
                         'questionOptions' => function ($query) {
                             $query->select(['id', 'question_id', 'value']);
                         },
-                        'topic:id,name',
-                        'objective:id,name'
+                        'topic:id,body',
+                        'objective:id,body'
                     ])
                     ->whereIn('id', $questionIds[$subjectId])
                     ->get();
 
                 //Structure response
 
-                $groupedQuestions[] = [
-                    ucwords($subjects_models[$subjectId]->name) => [
+                $groupedQuestions[ucwords($subjects_models[$subjectId]->name)] = [
                         'subject' => [
                             'id' => $subjects_models[$subjectId]->id,
                             'name' => ucwords($subjects_models[$subjectId]->name)
@@ -126,7 +125,7 @@ class MockExamService
                                 })->values()->toArray()
                             ];
                         })->toArray()
-                    ]
+
                 ];
             }
 

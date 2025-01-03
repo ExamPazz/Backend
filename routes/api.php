@@ -47,7 +47,7 @@ Route::group(
         Route::post('code/send/whatsapp', [OTPController::class, 'sendViaWhatsApp']);
         Route::post('auth/google', [GoogleAuthController::class, 'store']);
 
-        Route::post('/csv', [CsvImportController::class, 'importCsv']);
+        Route::post('questions/import', [CsvImportController::class, 'importQuestions']);
 
         Route::group(['prefix' => 'subscription-plan'], function () {
             Route::post('store', [SubscriptionPlanController::class, 'store']);
