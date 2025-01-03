@@ -32,12 +32,11 @@ class ResetPasswordController
         $user->password = Hash::make($request->input('password'));
         $saved = $user->save();
 
-        if ($saved)
-        {
-            ApiResponse::success("successful password reset");
+        if ($saved) {
+            return ApiResponse::success("successful password reset");
         }
 
-        ApiResponse::failure("failed password reset");
+        return ApiResponse::failure("failed password reset");
 
 
     }
