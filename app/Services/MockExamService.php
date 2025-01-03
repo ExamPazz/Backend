@@ -8,6 +8,10 @@ use App\Models\Subject;
 use App\Models\UserExamAnswer;
 use App\Models\Question;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Mockery\Exception;
 
 class MockExamService
 {
@@ -18,63 +22,138 @@ class MockExamService
      * @return array
      */
     public function generateMockExam($user)
-{
-    $examDetail = $user->latestExamDetail;
-
-    if (!$examDetail || empty($examDetail->subject_combinations)) {
-        throw new \InvalidArgumentException('User must select exactly 4 subjects.');
-    }
-
-    $subjects_ids = $examDetail->subject_combinations;
-
-    $subjects_models = Subject::query()
-        ->whereIn('id', $subjects_ids)->get(['id', 'name']);
-
-    if (count($subjects_ids) !== 4) {
-        throw new \InvalidArgumentException('User must select exactly 4 subjects.');
-    }
-
-    $selectedQuestions = [];
-    // Fetch questions for each subject
-    foreach ($subjects_ids as $subjectId) {
-        $questions = Question::query()
-            ->select(['id', 'year', 'question', 'image_url', 'subject_id', 'topic_id', 'objective_id'])
-            ->with(['questionOptions' => function ($query) {
-                $query->select(['id', 'question_id', 'value'])->inRandomOrder();
-            }, 'subject', 'topic', 'objective'])
-            ->where('subject_id', $subjectId)
-            ->inRandomOrder()
-            ->limit(50)
-            ->get();
-
-        if ($questions->isEmpty()) {
-            throw new \RuntimeException("No questions found for subject ID: {$subjectId}");
+    {
+        $cacheKey = "mock_exam_{$user->id}";
+        if ($cachedExam = Cache::get($cacheKey)) {
+            return $cachedExam;
         }
 
-        $selectedQuestions = array_merge($selectedQuestions, $questions->toArray());
+        $examDetail = $user->latestExamDetail;
+
+        if (!$examDetail || empty($examDetail->subject_combinations)) {
+            throw new \InvalidArgumentException('User must select exactly 4 subjects.');
+        }
+
+        $subjects_ids = $examDetail->subject_combinations;
+
+        if (count($subjects_ids) !== 4) {
+            throw new \InvalidArgumentException('User must select exactly 4 subjects.');
+        }
+
+        $subjects_models = Subject::query()
+            ->whereIn('id', $subjects_ids)
+            ->get(['id', 'name'])
+            ->keyBy('id');
+
+        $questionIds = [];
+        $groupedQuestions = [];
+
+        DB::beginTransaction();
+        try {
+            $mockExam = MockExam::query()->create([
+                'user_id' => $user->id,
+                'start_time' => now(),
+                'end_time' => now()->addMinutes(90), // 1 hour 30 minutes
+            ]);
+
+            foreach ($subjects_ids as $subject_id) {
+                $selectedQuestionIds = Question::query()
+                    ->where('subject_id', $subject_id)
+                    ->inRandomOrder()
+                    ->limit(50)
+                    ->pluck('id')
+                    ->toArray();
+
+                if (empty($selectedQuestionIds)) {
+                    throw new \RuntimeException("No questions found for subject ID: {$subject_id}");
+                }
+
+                $questionIds[$subject_id] = $selectedQuestionIds;
+
+                $mockExamQuestions = array_map(function ($questionId) use ($mockExam, $subject_id) {
+                    return [
+                        'mock_exam_id' => $mockExam->id,
+                        'question_id' => $questionId,
+                        'subject_id' => $subject_id,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }, $selectedQuestionIds);
+
+                MockExamQuestion::query()->insert($mockExamQuestions);
+            }
+
+            foreach ($subjects_ids as $subjectId) {
+                $questions = Question::query()
+                    ->select(['id', 'year', 'question', 'image_url', 'subject_id', 'topic_id', 'objective_id'])
+                    ->with([
+                        'questionOptions' => function ($query) {
+                            $query->select(['id', 'question_id', 'value']);
+                        },
+                        'topic:id,name',
+                        'objective:id,name'
+                    ])
+                    ->whereIn('id', $questionIds[$subjectId])
+                    ->get();
+
+                //Structure response
+
+                $groupedQuestions[] = [
+                    ucwords($subjects_models[$subjectId]->name) => [
+                        'subject' => [
+                            'id' => $subjects_models[$subjectId]->id,
+                            'name' => ucwords($subjects_models[$subjectId]->name)
+                        ],
+                        'questions' => $questions->map(function ($question) {
+                            return [
+                                'id' => $question->id,
+                                'year' => $question->year,
+                                'question' => $question->question,
+                                'image_url' => $question->image_url,
+                                'topic' => [
+                                    'id' => $question->topic->id,
+                                    'name' => $question->topic->name,
+                                ],
+                                'objective' => [
+                                    'id' => $question->objective->id,
+                                    'name' => $question->objective->name
+                                ],
+                                'options' => $question->questionOptions->shuffle()->map(function($option) {
+                                    return [
+                                      'id' => $option->id,
+                                      'value' => $option->value
+                                    ];
+                                })->values()->toArray()
+                            ];
+                        })->toArray()
+                    ]
+                ];
+            }
+
+            DB::commit();
+
+            Cache::put($cacheKey, $groupedQuestions, now()->addHours(2));
+
+            return $groupedQuestions;
+
+        } catch (Exception $exception) {
+            DB::rollBack();
+            throw $exception;
+        }
+
     }
 
-    $mockExam = MockExam::query()->create([
-        'user_id' => $user->id,
-        'start_time' => now(),
-        'end_time' => now()->addMinutes(90), // 1 hour 30 minutes
-    ]);
-
-    foreach ($selectedQuestions as $question) {
-        MockExamQuestion::query()->create([
-            'mock_exam_id' => $mockExam->id,
-            'question_id' => $question['id'],
-            'subject_id' => $question['subject_id'],
-        ]);
+    public function clearExamCache($userId): void
+    {
+        Cache::forget("mock_exam_{$userId}");
     }
 
-    return [
-        'subjects' => $subjects_models,
-        'questions' => $selectedQuestions,
-    ];
-}
-
-
+    public function handleExamError($userId, \Exception $e)
+    {
+        $this->clearExamCache($userId);
+        Log::error("Mock exam generation failed for user {$userId}: " . $e->getMessage());
+        throw $e;
+    }
 
     public function storeUserAnswer($user, $data)
     {
