@@ -99,32 +99,32 @@ class MockExamService
                 //Structure response
 
                 $groupedQuestions[ucwords($subjects_models[$subjectId]->name)] = [
-                        'subject' => [
-                            'id' => $subjects_models[$subjectId]->id,
-                            'name' => ucwords($subjects_models[$subjectId]->name)
-                        ],
-                        'questions' => $questions->map(function ($question) {
-                            return [
-                                'id' => $question->id,
-                                'year' => $question->year,
-                                'question' => $question->question,
-                                'image_url' => $question->image_url,
-                                'topic' => [
-                                    'id' => $question->topic->id,
-                                    'name' => $question->topic->name,
-                                ],
-                                'objective' => [
-                                    'id' => $question->objective->id,
-                                    'name' => $question->objective->name
-                                ],
-                                'options' => $question->questionOptions->shuffle()->map(function($option) {
-                                    return [
-                                      'id' => $option->id,
-                                      'value' => $option->value
-                                    ];
-                                })->values()->toArray()
-                            ];
-                        })->toArray()
+                    'subject' => [
+                        'id' => $subjects_models[$subjectId]->id,
+                        'name' => ucwords($subjects_models[$subjectId]->name)
+                    ],
+                    'questions' => $questions->map(function ($question) {
+                        return [
+                            'id' => $question->id,
+                            'year' => $question->year,
+                            'question' => $question->question,
+                            'image_url' => $question->image_url,
+                            'topic' => [
+                                'id' => $question->topic->id,
+                                'name' => $question->topic->name,
+                            ],
+                            'objective' => [
+                                'id' => $question->objective->id,
+                                'name' => $question->objective->name
+                            ],
+                            'options' => $question->questionOptions->shuffle()->map(function ($option) {
+                                return [
+                                    'id' => $option->id,
+                                    'value' => $option->value
+                                ];
+                            })->values()->toArray()
+                        ];
+                    })->toArray()
 
                 ];
             }
@@ -150,10 +150,103 @@ class MockExamService
     public function handleExamError($userId, \Exception $e)
     {
         $this->clearExamCache($userId);
-        Log::error("Mock exam generation failed for user {$userId}: " . $e->getMessage());
+        Log::error("Mock exam generation failed for user {$userId}: ".$e->getMessage());
         throw $e;
     }
 
+    public function storeExamAnswers($request)
+    {
+        DB::beginTransaction();
+        try {
+            $user = $request->user();
+            // Get all question IDs from the request
+            $questionIds = collect($request->answers)->pluck('question_id')->unique()->toArray();
+            $selectedOptionIds = collect($request->answers)->pluck('selected_option')->unique()->toArray();
+
+            // Fetch all questions and their correct options in one query
+            $questions = Question::with(['questionOptions' => function($query) use ($selectedOptionIds) {
+                $query->whereIn('id', $selectedOptionIds)
+                    ->select('id', 'question_id', 'is_correct');
+            }])
+                ->whereIn('id', $questionIds)
+                ->get()
+                ->keyBy('id');
+
+            // Validate all options belong to their respective questions
+            foreach ($request->answers as $answer) {
+                $question = $questions->get($answer['question_id']);
+                if (!$question || !$question->questionOptions->contains('id', $answer['selected_option'])) {
+                    throw new \Exception("Invalid option selected for question {$answer['question_id']}");
+                }
+            }
+
+            // Prepare bulk insert data
+            $answersToInsert = [];
+            $results = [];
+            $now = now();
+
+            foreach ($request->answers as $answer) {
+                $question = $questions->get($answer['question_id']);
+                $selectedOption = $question->questionOptions->firstWhere('id', $answer['selected_option']);
+
+                $answersToInsert[] = [
+                    'mock_exam_id' => $request->mock_exam_id,
+                    'user_id' => $user->id,
+                    'question_id' => $answer['question_id'],
+                    'selected_option' => $answer['selected_option'],
+                    'is_correct' => $selectedOption->is_correct,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+
+                $results[] = [
+                    'question_id' => $answer['question_id'],
+                    'is_correct' => $selectedOption->is_correct
+                ];
+            }
+
+            // Delete any existing answers for this exam (in case of resubmission)
+            UserExamAnswer::query()->where('mock_exam_id', $request->mock_exam_id)
+                ->where('user_id', $user->id)
+                ->delete();
+
+            // Bulk insert all answers
+            UserExamAnswer::query()->insert($answersToInsert);
+
+            // Calculate score
+            $totalQuestions = count($request->answers);
+            $correctAnswers = count(array_filter($results, fn($result) => $result['is_correct']));
+            $score = ($correctAnswers / $totalQuestions) * 100;
+
+            // Update mock exam score
+            MockExam::query()->where('id', $request->mock_exam_id)
+                ->where('user_id', $user->id)
+                ->whereNull('completed_at')
+                ->update([
+                    'score' => $score,
+                    'completed_at' => $now,
+                    'total_questions' => $totalQuestions,
+                    'correct_answers' => $correctAnswers
+                ]);
+
+            DB::commit();
+
+            return [
+                'results' => $results,
+                'score' => round($score, 2),
+                'total_questions' => $totalQuestions,
+                'correct_answers' => $correctAnswers
+            ];
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
+            ];
+        }
+    }
     public function storeUserAnswer($user, $data)
     {
         $question = Question::find($data['question_id']);

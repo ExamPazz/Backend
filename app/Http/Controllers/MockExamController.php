@@ -3,9 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreUserAnswerRequest;
+use App\Models\MockExam;
+use App\Models\Question;
+use App\Models\UserExamAnswer;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Services\MockExamService;
 use App\Support\ApiResponse;
+use Illuminate\Support\Facades\DB;
 
 class MockExamController extends Controller
 {
@@ -27,14 +32,17 @@ class MockExamController extends Controller
         ]);
     }
 
-    public function storeUserAnswer(StoreUserAnswerRequest $request)
+    public function storeUserAnswer(StoreUserAnswerRequest $request): JsonResponse
     {
-        $validated = $request->all();
-        $user = $request->user();
+        $response = $this->mockExamService->storeExamAnswers($request);
 
-        $result = $this->mockExamService->storeUserAnswer($user, $validated);
+        if (isset($response['success']) && !$response['success'])
+        {
+            return ApiResponse::failure('Exam submission failed');
+        }
+        return ApiResponse::success('Exam submission successful', $response);
 
-        return ApiResponse::success('Answer saved successfully', $result);
+
     }
 
     public function calculateScore(Request $request, $mockExamId)

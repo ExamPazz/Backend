@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreUserAnswerRequest extends FormRequest
 {
@@ -22,9 +23,29 @@ class StoreUserAnswerRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'mock_exam_id' => 'required|exists:mock_exams,id',
-            'question_id' => 'required|exists:questions,id',
-            'selected_option' => 'exists:question_options,value'
+            'mock_exam_id' => [
+                'required',
+                'integer',
+                Rule::exists('mock_exams', 'id')->where(function ($query) {
+                    $query->where('user_id', auth()->id());
+                })
+            ],
+            'answers' => ['required', 'array'],
+
+            'answers.*.question_id' => [
+                'required',
+                'integer',
+                Rule::exists('mock_exam_questions', 'question_id')
+                    ->where('mock_exam_id', $this->mock_exam_id),
+            ],
+            'answers.*.selected_option' => [
+                'required',
+                'integer',
+                'exists:question_options,id'
+            ],
+
+//            'answers.*.question_id' => ['required', 'integer', 'exists:questions,id'],
+//            'answers.*.selected_option' => ['required', 'integer', 'exists:question_options,id'],
         ];
     }
 }
