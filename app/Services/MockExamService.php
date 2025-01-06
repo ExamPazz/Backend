@@ -287,12 +287,10 @@ class MockExamService
         ];
     }
 
-    public function finalizeExam($request, $mockExamId)
+    public function finalizeExam($user, $mockExamId)
     {
         DB::beginTransaction();
         try {
-            $user = $request->user();
-
             // Retrieve the mock exam
             $mockExam = MockExam::where('id', $mockExamId)
                 ->where('user_id', $user->id)
