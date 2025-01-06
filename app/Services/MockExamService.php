@@ -131,9 +131,11 @@ class MockExamService
 
             DB::commit();
 
+            $groupedQuestions = ['questions' => $groupedQuestions, 'mock_exam_id' => $mockExam->id];
+
             Cache::put($cacheKey, $groupedQuestions, now()->addHours(2));
 
-            return ['questions' => $groupedQuestions, 'mock_exam_id' => $mockExam->id];
+            return $groupedQuestions;
 
         } catch (Exception $exception) {
             DB::rollBack();
