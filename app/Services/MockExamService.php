@@ -133,7 +133,7 @@ class MockExamService
 
             Cache::put($cacheKey, $groupedQuestions, now()->addHours(2));
 
-            return $groupedQuestions;
+            return ['questions' => $groupedQuestions, 'mock_exam_id' => $mockExam->id];
 
         } catch (Exception $exception) {
             DB::rollBack();

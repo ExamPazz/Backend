@@ -28,7 +28,8 @@ class MockExamController extends Controller
         $mockExamData = $this->mockExamService->generateMockExam($user);
 
         return ApiResponse::success('Exam generated successfully', [
-            'exam_questions_data' => $mockExamData,
+            'mock_exam_id' => $mockExamData['mock_exam_id'],
+            'exam_questions_data' => $mockExamData['questions'],
         ]);
     }
 
