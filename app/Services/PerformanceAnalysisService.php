@@ -104,5 +104,8 @@ class PerformanceAnalysisService
         return $result;
     }
 
-
+    public function getUserMockExamCount($user)
+    {
+        return MockExam::where('user_id', $user->id)->count();
+    }
 }

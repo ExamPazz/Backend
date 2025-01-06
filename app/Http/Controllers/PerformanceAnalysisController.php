@@ -34,4 +34,13 @@ class PerformanceAnalysisController extends Controller
 
         return ApiResponse::success('User exam analysis retrieved successfully', $result);
     }
+
+    public function getUserMockExamsCount(Request $request)
+    {
+        $user = $request->user(); 
+
+        $result = $this->performanceAnalysisService->getUserMockExamCount($user);
+
+        return ApiResponse::success('User exam count successfully', $result);
+    }
 }
