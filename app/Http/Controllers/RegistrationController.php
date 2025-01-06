@@ -7,7 +7,9 @@ use App\Http\Requests\RegistrationRequest;
 use App\Repository\UserRepository;
 use App\Support\ApiResponse;
 use App\Support\OtpHelper;
-use Illuminate\Http\Request;
+use App\Models\SubscriptionPlan;
+use App\Models\Subscription;
+
 
 class RegistrationController extends Controller
 {
@@ -24,7 +26,16 @@ class RegistrationController extends Controller
 
          if ($user)
          {
-             $otp = $this->otpHelper->generateOtp($user, 20);
+            // Assign default subscription plan "Freemium"
+            $freemiumPlan = SubscriptionPlan::where('name', 'Freemium')->first();
+            if ($freemiumPlan) {
+                Subscription::create([
+                    'subscription_plan_id' => $freemiumPlan->id,
+                    'user_id' => $user->id,
+                    'status' => 'active',
+                    'payment_provider_data' => null,
+            ]);
+            $otp = $this->otpHelper->generateOtp($user, 20);
               event(new NewUserRegistrationEvent($user, $otp['code']));
              return ApiResponse::success('Account Registration Successful', [
                 'user' => $user
@@ -32,4 +43,5 @@ class RegistrationController extends Controller
          }
         return ApiResponse::success('Account Registration Successful');
     }
+}
 }
