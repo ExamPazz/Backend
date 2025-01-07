@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class StoreUserAnswerRequest extends FormRequest
@@ -31,7 +32,6 @@ class StoreUserAnswerRequest extends FormRequest
                 })
             ],
             'answers' => ['required', 'array'],
-
             'answers.*.question_id' => [
                 'required',
                 'integer',
@@ -39,13 +39,17 @@ class StoreUserAnswerRequest extends FormRequest
                     ->where('mock_exam_id', $this->mock_exam_id),
             ],
             'answers.*.selected_option' => [
-                'required',
+                'nullable',
                 'integer',
-                'exists:question_options,id'
+                function ($attribute, $value, $fail) {
+                    if (!is_null($value)) {
+                        $exists = DB::table('question_options')->where('id', $value)->exists();
+                        if (!$exists) {
+                            $fail('The selected option does not exist.');
+                        }
+                    }
+                }
             ],
-
-//            'answers.*.question_id' => ['required', 'integer', 'exists:questions,id'],
-//            'answers.*.selected_option' => ['required', 'integer', 'exists:question_options,id'],
         ];
     }
 }

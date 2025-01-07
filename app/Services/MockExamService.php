@@ -139,7 +139,7 @@ class MockExamService
 
         } catch (Exception $exception) {
             DB::rollBack();
-            throw $exception;
+            $this->handleExamError($user->id, $exception);
         }
 
     }
@@ -163,21 +163,38 @@ class MockExamService
             $user = $request->user();
             // Get all question IDs from the request
             $questionIds = collect($request->answers)->pluck('question_id')->unique()->toArray();
-            $selectedOptionIds = collect($request->answers)->pluck('selected_option')->unique()->toArray();
+
+            // Get selected option IDs, excluding null values
+            $selectedOptionIds = collect($request->answers)
+                ->pluck('selected_option')
+                ->filter()  // Remove null values
+                ->unique()
+                ->toArray();
 
             // Fetch all questions and their correct options in one query
             $questions = Question::with(['questionOptions' => function($query) use ($selectedOptionIds) {
-                $query->whereIn('id', $selectedOptionIds)
-                    ->select('id', 'question_id', 'is_correct');
+                if (!empty($selectedOptionIds)) {
+                    $query->whereIn('id', $selectedOptionIds);
+                }
+                $query->select('id', 'question_id', 'is_correct');
             }])
                 ->whereIn('id', $questionIds)
                 ->get()
                 ->keyBy('id');
 
-            // Validate all options belong to their respective questions
+            // Get total questions for this mock exam
+            $totalQuestions = MockExamQuestion::where('mock_exam_id', $request->mock_exam_id)->count();
+
+            // Validate options when they are selected
             foreach ($request->answers as $answer) {
                 $question = $questions->get($answer['question_id']);
-                if (!$question || !$question->questionOptions->contains('id', $answer['selected_option'])) {
+                if (!$question) {
+                    throw new \Exception("Invalid question ID: {$answer['question_id']}");
+                }
+
+                // Only validate if an option was selected
+                if (isset($answer['selected_option']) &&
+                    !$question->questionOptions->contains('id', $answer['selected_option'])) {
                     throw new \Exception("Invalid option selected for question {$answer['question_id']}");
                 }
             }
@@ -189,21 +206,26 @@ class MockExamService
 
             foreach ($request->answers as $answer) {
                 $question = $questions->get($answer['question_id']);
-                $selectedOption = $question->questionOptions->firstWhere('id', $answer['selected_option']);
+                $selectedOption = null;
+
+                if (isset($answer['selected_option'])) {
+                    $selectedOption = $question->questionOptions->firstWhere('id', $answer['selected_option']);
+                }
 
                 $answersToInsert[] = [
                     'mock_exam_id' => $request->mock_exam_id,
                     'user_id' => $user->id,
                     'question_id' => $answer['question_id'],
-                    'selected_option' => $answer['selected_option'],
-                    'is_correct' => $selectedOption->is_correct,
+                    'selected_option' => $answer['selected_option'] ?? null,
+                    'is_correct' => $selectedOption ? $selectedOption->is_correct : false,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ];
 
                 $results[] = [
                     'question_id' => $answer['question_id'],
-                    'is_correct' => $selectedOption->is_correct
+                    'is_correct' => $selectedOption ? $selectedOption->is_correct : false,
+                    'answered' => isset($answer['selected_option'])
                 ];
             }
 
@@ -215,10 +237,11 @@ class MockExamService
             // Bulk insert all answers
             UserExamAnswer::query()->insert($answersToInsert);
 
-            // Calculate score
-            $totalQuestions = count($request->answers);
-            $correctAnswers = count(array_filter($results, fn($result) => $result['is_correct']));
-            $score = ($correctAnswers / $totalQuestions) * 100;
+            // Calculate metrics
+            $totalAnswered = count(array_filter($results, fn($result) => $result['answered']));
+            $totalCorrect = count(array_filter($results, fn($result) => $result['is_correct']));
+            $totalWrong = $totalAnswered - $totalCorrect;
+            $score = ($totalCorrect / $totalQuestions) * 100;
 
             // Update mock exam score
             MockExam::query()->where('id', $request->mock_exam_id)
@@ -228,16 +251,24 @@ class MockExamService
                     'score' => $score,
                     'completed_at' => $now,
                     'total_questions' => $totalQuestions,
-                    'correct_answers' => $correctAnswers
+                    'total_answered' => $totalAnswered,
+                    'total_correct' => $totalCorrect,
+                    'total_wrong' => $totalWrong
                 ]);
 
             DB::commit();
+            $cacheKey = "mock_exam_{$user->id}";
+            if (Cache::has($cacheKey)) {
+                Cache::forget($cacheKey);
+            }
 
             return [
                 'results' => $results,
                 'score' => round($score, 2),
                 'total_questions' => $totalQuestions,
-                'correct_answers' => $correctAnswers
+                'total_answered' => $totalAnswered,
+                'total_correct' => $totalCorrect,
+                'total_wrong' => $totalWrong
             ];
 
         } catch (\Exception $e) {

@@ -14,6 +14,14 @@ return new class extends Migration
         Schema::create('mock_exams', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->index();
+            $table->timestamp('start_time')->nullable();
+            $table->timestamp('end_time')->nullable();
+            $table->timestamp('completed_at')->nullable();
+            $table->decimal('score')->nullable();
+            $table->integer('total_questions')->nullable();
+            $table->integer('total_answered')->nullable();
+            $table->integer('total_correct')->nullable();
+            $table->integer('total_wrong')->nullable();
             $table->timestamps();
         });
     }

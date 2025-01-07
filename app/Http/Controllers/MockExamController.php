@@ -3,14 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreUserAnswerRequest;
-use App\Models\MockExam;
-use App\Models\Question;
-use App\Models\UserExamAnswer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Services\MockExamService;
 use App\Support\ApiResponse;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class MockExamController extends Controller
 {
@@ -39,7 +36,8 @@ class MockExamController extends Controller
 
         if (isset($response['success']) && !$response['success'])
         {
-            return ApiResponse::failure('Exam submission failed');
+            Log::error('Exam submission failed', $response);
+            return ApiResponse::failure('Exam submission failed', $response);
         }
         return ApiResponse::success('Exam submission successful', $response);
 
