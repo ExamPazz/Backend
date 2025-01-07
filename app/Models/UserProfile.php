@@ -13,6 +13,8 @@ class UserProfile extends Model
         'nationality',
         'region',
         'city',
+        'gender',
+        'date_of_birth'
     ];
 
     public function user()

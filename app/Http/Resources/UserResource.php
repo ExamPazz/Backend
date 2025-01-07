@@ -20,7 +20,8 @@ class UserResource extends JsonResource
             'region' => $this->userProfile->region ?? null,
             'city' => $this->userProfile->city ?? null,
             'nationality' => $this->userProfile->nationality ?? null,
-            'age' => $this->userProfile->age ?? null,
+            'gender' => $this->userProfile->gender ?? null,
+            'date_of_birth' => $this->userProfile->date_of_birth ?? null,
         ];
     }
 }

@@ -28,6 +28,8 @@ class UpdateUserRequest extends FormRequest
             'city' => 'string|max:255',
             'nationality' => 'string|max:255',
             'age' => 'integer|min:0',
+            'date_of_birth' => 'nullable|date',
+            'gender' => 'nullable|string|in:male,female',
         ];
     }
 }
