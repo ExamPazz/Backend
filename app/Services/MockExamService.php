@@ -421,27 +421,49 @@ class MockExamService
 
     public function getMockExamDetails($user, $mockExamId)
     {
-        $mockExam = MockExam::with(['mockExamQuestions.question', 'userAnswers'])
-            ->where('id', $mockExamId)
-            ->where('user_id', $user->id)
-            ->firstOrFail();
+        $mockExam = MockExam::with([
+            'mockExamQuestions.question.questionOptions',
+            'mockExamQuestions.question.topic',
+            'mockExamQuestions.question.objective',
+            'userAnswers',
+        ])
+        ->where('id', $mockExamId)
+        ->where('user_id', $user->id)
+        ->firstOrFail();
 
-        return $mockExam->mockExamQuestions->map(function ($mockExamQuestion) use ($mockExam) {
-            $question = $mockExamQuestion->question;
-            $userAnswer = $mockExam->userAnswers
-                ->where('question_id', $question->id)
-                ->first();
-
-            return [
-                'id' => $question->id,
-                'question' => $question->question,
-                'options' => $question->questionOptions,
-                'image_url' => $question->image_url,
-                'correct_option' => $question->questionOptions->pluck('value'),
-                'solution' => $question->solution,
-                'user_answer' => $userAnswer?->selected_option,
-                'is_correct' => $userAnswer?->is_correct,
-            ];
+        $groupedQuestions = $mockExam->mockExamQuestions->groupBy(function ($mockExamQuestion) {
+            return $mockExamQuestion->question->subject->name; // Group by subject name
         });
+
+        return $groupedQuestions->map(function ($questions, $subjectName) use ($mockExam) {
+            return [
+                'subject' => [
+                    'name' => $subjectName,
+                    'id' => $questions->first()->question->subject->id,
+                ],
+                'questions' => $questions->map(function ($mockExamQuestion) use ($mockExam) {
+                    $question = $mockExamQuestion->question;
+                    $userAnswer = $mockExam->userAnswers
+                        ->where('question_id', $question->id)
+                        ->first();
+
+                    return [
+                        'id' => $question->id,
+                        'question' => $question->question,
+                        'options' => $question->questionOptions->map(function ($option) {
+                            return [
+                                'id' => $option->id,
+                                'value' => $option->value,
+                            ];
+                        }),
+                        'image_url' => $question->image_url,
+                        'correct_option' => $question->questionOptions->pluck('value'),
+                        'solution' => $question->solution,
+                        'user_answer' => $userAnswer?->selected_option,
+                        'is_correct' => $userAnswer?->is_correct,
+                    ];
+                })->toArray(),
+            ];
+        })->values();
     }
 }
