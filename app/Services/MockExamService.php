@@ -240,7 +240,7 @@ class MockExamService
             // Calculate metrics
             $totalAnswered = count(array_filter($results, fn($result) => $result['answered']));
             $totalCorrect = count(array_filter($results, fn($result) => $result['is_correct']));
-            $totalWrong = $totalAnswered - $totalCorrect;
+            $totalWrong = $totalQuestions - $totalAnswered - $totalCorrect;
             $score = ($totalCorrect / $totalQuestions) * 100;
 
             // Update mock exam score
