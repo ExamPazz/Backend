@@ -31,9 +31,9 @@ class StoreUserAnswerRequest extends FormRequest
                     $query->where('user_id', auth()->id());
                 })
             ],
-            'answers' => ['required', 'array'],
+            'answers' => ['nullable', 'array'],
             'answers.*.question_id' => [
-                'required',
+                'nullable',
                 'integer',
                 Rule::exists('mock_exam_questions', 'question_id')
                     ->where('mock_exam_id', $this->mock_exam_id),
