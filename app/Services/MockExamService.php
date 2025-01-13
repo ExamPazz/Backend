@@ -438,9 +438,7 @@ class MockExamService
             ->where('user_id', $user->id)
             ->firstOrFail();
 
-        $groupedQuestions = $mockExam->mockExamQuestions->groupBy(function ($mockExamQuestion) {
-            return $mockExamQuestion->question->subject->name; // Group by subject name
-        });
+        $groupedQuestions = $mockExam->mockExamQuestions->groupBy('question.subject.name');
 
         return $groupedQuestions->map(function ($questions, $subjectName) use ($mockExam) {
             return [
