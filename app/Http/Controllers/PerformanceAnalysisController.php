@@ -43,4 +43,14 @@ class PerformanceAnalysisController extends Controller
 
         return ApiResponse::success('User exam count successfully', $result);
     }
+
+    public function getOverallSubjectAnalysis(Request $request)
+    {
+        $user = $request->user(); 
+
+        $result = $this->performanceAnalysisService->getUserOverallSubjectAnalysis($user);
+
+        return ApiResponse::success('User subjects analysis generated successfully', $result);
+    }
+
 }
