@@ -11,8 +11,8 @@ class ApiResponse
         $response['message'] = $message;
 
         if (!empty($data)) {
-            // Automatically convert resources or objects to arrays
-            $response['data'] = is_array($data) ? $data : (method_exists($data, 'toArray') ? $data->toArray(request()) : $data);
+            // Check if $data is an object before calling method_exists
+            $response['data'] = is_array($data) ? $data : (is_object($data) && method_exists($data, 'toArray') ? $data->toArray(request()) : $data);
         }
 
         if ($return_empty_data) {

@@ -10,6 +10,7 @@ use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\ResetPasswordController;
 use App\Http\Controllers\UserProfileController;
 use App\Http\Controllers\CsvImportController;
+use App\Http\Controllers\ImportKeyController;
 use App\Http\Controllers\MockExamController;
 use App\Http\Controllers\PerfomanceAnalysisController;
 use App\Http\Controllers\PerformanceAnalysisController;
@@ -49,6 +50,7 @@ Route::group(
 
 //        Route::post('questions/import', [CsvImportController::class, 'importQuestions']);
         Route::post('questions/import', [CsvImportController::class, 'importCsv']);
+        Route::post('keys/import', [ImportKeyController::class, 'importCSV']);
 
         Route::group(['prefix' => 'subscription-plan'], function () {
             Route::post('store', [SubscriptionPlanController::class, 'store']);
@@ -69,6 +71,7 @@ Route::group(
             Route::get('/mock-exam/{mockExamId}/details', [MockExamController::class, 'getMockExamDetails']);
             Route::resource('subjects', SubjectController::class);
             Route::get('/user/analysis', [PerformanceAnalysisController::class, 'getUserExamAnalysis']);
+            Route::get('/user/subjects/analysis', [PerformanceAnalysisController::class, 'getOverallSubjectAnalysis']);
             Route::get('/user/mock-exams', [PerformanceAnalysisController::class, 'getUserMockExams']);
             Route::get('/user/mock-exams/count', [PerformanceAnalysisController::class, 'getUserMockExamsCount']);
         });

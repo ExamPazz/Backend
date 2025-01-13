@@ -90,9 +90,17 @@ class User extends Authenticatable
     }
 
     public function latestExamDetail()
-{
-    return $this->hasOne(ExamDetail::class)->latestOfMany();
-}
+    {
+        return $this->hasOne(ExamDetail::class)->latestOfMany();
+    }
 
+    public function hasMockExam(): bool
+    {
+        return $this->mockExams()->exists();
+    }
 
+    public function mockExams()
+    {
+        return $this->hasMany(MockExam::class);
+    }
 }

@@ -165,13 +165,10 @@ class MockExamService
         DB::beginTransaction();
         try {
             $user = $request->user();
-            // Get all question IDs from the request
             $questionIds = collect($request->answers)->pluck('question_id')->unique()->toArray();
-
-            // Get selected option IDs, excluding null values
             $selectedOptionIds = collect($request->answers)
                 ->pluck('selected_option')
-                ->filter()  // Remove null values
+                ->filter()
                 ->unique()
                 ->toArray();
 
@@ -188,24 +185,20 @@ class MockExamService
                 ->get()
                 ->keyBy('id');
 
-            // Get total questions for this mock exam
             $totalQuestions = MockExamQuestion::where('mock_exam_id', $request->mock_exam_id)->count();
 
-            // Validate options when they are selected
             foreach ($request->answers as $answer) {
                 $question = $questions->get($answer['question_id']);
                 if (!$question) {
                     throw new \Exception("Invalid question ID: {$answer['question_id']}");
                 }
 
-                // Only validate if an option was selected
                 if (isset($answer['selected_option']) &&
                     !$question->questionOptions->contains('id', $answer['selected_option'])) {
                     throw new \Exception("Invalid option selected for question {$answer['question_id']}");
                 }
             }
 
-            // Prepare bulk insert data
             $answersToInsert = [];
             $results = [];
             $now = now();
@@ -218,12 +211,14 @@ class MockExamService
                     $selectedOption = $question->questionOptions->firstWhere('id', $answer['selected_option']);
                 }
 
+                // Include time spent in the data
                 $answersToInsert[] = [
                     'mock_exam_id' => $request->mock_exam_id,
                     'user_id' => $user->id,
                     'question_id' => $answer['question_id'],
                     'selected_option' => $answer['selected_option'] ?? null,
                     'is_correct' => $selectedOption ? $selectedOption->is_correct : false,
+                    'time_spent' => $answer['time_spent'] ?? 0, // Default to 0 if not provided
                     'created_at' => $now,
                     'updated_at' => $now,
                 ];
@@ -231,25 +226,21 @@ class MockExamService
                 $results[] = [
                     'question_id' => $answer['question_id'],
                     'is_correct' => $selectedOption ? $selectedOption->is_correct : false,
-                    'answered' => isset($answer['selected_option'])
+                    'answered' => isset($answer['selected_option']),
                 ];
             }
 
-            // Delete any existing answers for this exam (in case of resubmission)
             UserExamAnswer::query()->where('mock_exam_id', $request->mock_exam_id)
                 ->where('user_id', $user->id)
                 ->delete();
 
-            // Bulk insert all answers
             UserExamAnswer::query()->insert($answersToInsert);
 
-            // Calculate metrics
             $totalAnswered = count(array_filter($results, fn($result) => $result['answered']));
             $totalCorrect = count(array_filter($results, fn($result) => $result['is_correct']));
             $totalWrong = $totalQuestions - $totalAnswered - $totalCorrect;
             $score = ($totalCorrect / $totalQuestions) * 100;
 
-            // Update mock exam score
             MockExam::query()->where('id', $request->mock_exam_id)
                 ->where('user_id', $user->id)
                 ->whereNull('completed_at')
@@ -259,7 +250,7 @@ class MockExamService
                     'total_questions' => $totalQuestions,
                     'total_answered' => $totalAnswered,
                     'total_correct' => $totalCorrect,
-                    'total_wrong' => $totalWrong
+                    'total_wrong' => $totalWrong,
                 ]);
 
             DB::commit();
@@ -282,15 +273,14 @@ class MockExamService
                 'total_questions' => $totalQuestions,
                 'total_answered' => $totalAnswered,
                 'total_correct' => $totalCorrect,
-                'total_wrong' => $totalWrong
+                'total_wrong' => $totalWrong,
             ];
-
         } catch (\Exception $e) {
             DB::rollBack();
 
             return [
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ];
         }
     }
