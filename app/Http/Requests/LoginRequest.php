@@ -70,7 +70,7 @@ class LoginRequest extends FormRequest
 
         $access_token = $user->createToken('auth_token')->plainTextToken;
         return ApiResponse::success('Login Successful', [
-            'user' => $user->load('subscription'),
+            'user' => $user->load('subscription.subscriptionPlan'),
             'has_exam_detail' => $hasExamDetail,
             'access_token' => $access_token
         ]);
