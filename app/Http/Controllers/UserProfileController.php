@@ -11,7 +11,7 @@ class UserProfileController extends Controller
 {
     public function getAuthenticatedUser(Request $request)
     {
-        $user = $request->user()->load('latestExamDetail', 'subscription');
+        $user = $request->user()->load('latestExamDetail', 'subscription.subscriptionPlan');
 
         return ApiResponse::success('User data fetched successfully', new UserResource($user));
     }
