@@ -455,7 +455,7 @@ class MockExamService
                     return [
                         'id' => $question->id,
                         'question' => $question->question,
-                        'options' => $question->questionOptions->map(function ($option) {
+                        'options' => $question->questionOptions->whereNotNull('value')->map(function ($option) {
                             return [
                                 'id' => $option->id,
                                 'value' => $option->value,
