@@ -20,6 +20,7 @@ class MockExamService
      *
      * @param  \App\Models\User  $user
      * @return array
+     * @throws \Exception
      */
     public function generateMockExam($user)
     {
@@ -48,9 +49,12 @@ class MockExamService
         $questionIds = [];
         $groupedQuestions = [];
 
+        $userActiveSubscription = getUserCurrentActiveSubscription($user);
+
         DB::beginTransaction();
         try {
             $mockExam = MockExam::query()->create([
+                'subscription_id' => $userActiveSubscription->id,
                 'user_id' => $user->id,
                 'start_time' => now(),
                 'end_time' => now()->addMinutes(90), // 1 hour 30 minutes
@@ -168,12 +172,15 @@ class MockExamService
                 ->unique()
                 ->toArray();
 
-            $questions = Question::with(['questionOptions' => function ($query) use ($selectedOptionIds) {
-                if (!empty($selectedOptionIds)) {
-                    $query->whereIn('id', $selectedOptionIds);
+            // Fetch all questions and their correct options in one query
+            $questions = Question::with([
+                'questionOptions' => function ($query) use ($selectedOptionIds) {
+                    if (!empty($selectedOptionIds)) {
+                        $query->whereIn('id', $selectedOptionIds);
+                    }
+                    $query->select('id', 'question_id', 'is_correct');
                 }
-                $query->select('id', 'question_id', 'is_correct');
-            }])
+            ])
                 ->whereIn('id', $questionIds)
                 ->get()
                 ->keyBy('id');
@@ -252,6 +259,14 @@ class MockExamService
                 Cache::forget($cacheKey);
             }
 
+            $examsLeft = totalMockExamsLeft($user);
+            if ($examsLeft == 0)
+            {
+                $userSubscription = getUserCurrentActiveSubscription($user);
+                $userSubscription->update([
+                    'status' => 'inactive'
+                ]);
+            }
             return [
                 'results' => $results,
                 'score' => round($score, 2),
@@ -330,10 +345,12 @@ class MockExamService
                 $selectedOptionIds = collect($answersFromRequest)->pluck('selected_option')->unique()->toArray();
 
                 // Fetch all questions and their correct options in one query
-                $questions = Question::with(['questionOptions' => function ($query) use ($selectedOptionIds) {
-                    $query->whereIn('id', $selectedOptionIds)
-                        ->select('id', 'question_id', 'is_correct');
-                }])
+                $questions = Question::with([
+                    'questionOptions' => function ($query) use ($selectedOptionIds) {
+                        $query->whereIn('id', $selectedOptionIds)
+                            ->select('id', 'question_id', 'is_correct');
+                    }
+                ])
                     ->whereIn('id', $questionIds)
                     ->get()
                     ->keyBy('id');
@@ -417,13 +434,11 @@ class MockExamService
             'mockExamQuestions.question.objective',
             'userAnswers',
         ])
-        ->where('id', $mockExamId)
-        ->where('user_id', $user->id)
-        ->firstOrFail();
+            ->where('id', $mockExamId)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
 
-        $groupedQuestions = $mockExam->mockExamQuestions->groupBy(function ($mockExamQuestion) {
-            return $mockExamQuestion->question->subject->name; // Group by subject name
-        });
+        $groupedQuestions = $mockExam->mockExamQuestions->groupBy('question.subject.name');
 
         return $groupedQuestions->map(function ($questions, $subjectName) use ($mockExam) {
             return [
@@ -440,7 +455,7 @@ class MockExamService
                     return [
                         'id' => $question->id,
                         'question' => $question->question,
-                        'options' => $question->questionOptions->map(function ($option) {
+                        'options' => $question->questionOptions->whereNotNull('value')->map(function ($option) {
                             return [
                                 'id' => $option->id,
                                 'value' => $option->value,
