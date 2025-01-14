@@ -19,6 +19,8 @@ class PerformanceAnalysisService
         $totalAnsweredQuestions = 0;
         $totalCorrectAnswers = 0;
         $totalExamScores = 0;
+        $totalTimeSpent = 0; // Total time spent in seconds
+        $totalExams = $mockExams->count();
 
         foreach ($mockExams as $mockExam) {
             $userAnswers = UserExamAnswer::where('mock_exam_id', $mockExam->id)
@@ -27,10 +29,12 @@ class PerformanceAnalysisService
 
             $mockExamQuestionsCount = $mockExam->mockExamQuestions->count();
             $correctAnswers = $userAnswers->where('is_correct', true)->count();
+            $examTimeSpent = $mockExam->average_time_per_exam ?? 0; // Time in seconds sent by frontend
 
             $totalQuestions += $mockExamQuestionsCount;
             $totalAnsweredQuestions += $userAnswers->count();
             $totalCorrectAnswers += $correctAnswers;
+            $totalTimeSpent += $examTimeSpent;
 
             if ($mockExamQuestionsCount > 0) {
                 $examScore = ($correctAnswers / $mockExamQuestionsCount) * 100;
@@ -38,20 +42,26 @@ class PerformanceAnalysisService
             }
         }
 
-        // Normalize the overall average score over 400
-        $normalizedTotalCorrectAnswers = min($totalCorrectAnswers, 400); 
-        $averageScore = ($normalizedTotalCorrectAnswers / 400) * 100;
+        $normalizedTotalCorrectAnswers = min($totalCorrectAnswers, 400);
+
+        $averageScore = $normalizedTotalCorrectAnswers;
 
         $skippedQuestions = $totalQuestions - $totalAnsweredQuestions;
 
+        $averageTimePerExam = $totalExams > 0 ? round($totalTimeSpent / $totalExams) : 0;
+        $averageTimePerQuestion = $totalAnsweredQuestions > 0 ? round($totalTimeSpent / $totalAnsweredQuestions) : 0;
+
         return [
-            'average_score' => $averageScore, 
+            'average_score' => $averageScore, // Average score over 400
             'total_questions' => $totalQuestions,
             'answered_questions' => $totalAnsweredQuestions,
             'correct_answers' => $totalCorrectAnswers,
             'skipped_questions' => $skippedQuestions,
+            'average_time_per_exam' => $averageTimePerExam,
+            'average_time_per_question' => $averageTimePerQuestion, 
         ];
     }
+
 
     public function getUserMockExamsWithScores($user)
     {
