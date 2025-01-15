@@ -462,7 +462,7 @@ class MockExamService
                             ];
                         }),
                         'image_url' => $question->image_url,
-                        'correct_option' => $question->questionOptions->pluck('value'),
+                        'correct_option' => $question->questionOptions->where('is_correct', true)->pluck('value')->first(),  
                         'solution' => $question->solution,
                         'user_answer' => $userAnswer?->selected_option,
                         'is_correct' => $userAnswer?->is_correct,
