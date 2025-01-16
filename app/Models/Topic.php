@@ -15,4 +15,9 @@ class Topic extends Model
     {
         return $this->hasMany(Question::class);
     }
+
+    public function objectives()
+    {
+        return $this->hasMany(Objective::class);
+    }
 }

@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('code'); // Roman numerals i-v
             $table->foreignId('subject_id')->index()->nullable();
-            $table->text('body');
+            $table->text('body')->nullable();
             $table->timestamps();
         });
     }
