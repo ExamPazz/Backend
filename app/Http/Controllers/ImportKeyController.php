@@ -13,91 +13,124 @@ use Illuminate\Support\Facades\Validator;
 
 class ImportKeyController extends Controller
 {
-    public function importStructureForChem(Request $request)
+    public function importStructureForComm(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'csv_file' => 'required|file|mimes:csv,txt',
             'subject' => 'required|string|max:255', // Validate the subject field
         ]);
-    
+        
             if ($validator->fails()) {
                 return response()->json(['error' => $validator->errors()], 422);
             }
-    
+        
             $csvFile = $request->file('csv_file');
-    
+        
             $xlsxPath = $csvFile->getRealPath();
             $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($xlsxPath);
             $sheet = $spreadsheet->getActiveSheet();
-    
+        
             DB::beginTransaction();
-    
+        
             try {
                 $subjectName = $request->input('subject');
                 $subject = Subject::firstOrCreate(['name' => $subjectName]);
-    
+        
                 foreach ($sheet->getRowIterator(2) as $row) {
                     $cells = $row->getCellIterator();
                     $cells->setIterateOnlyExistingCells(false);
-    
+        
                     $sectionRaw = $cells->current()->getValue(); $cells->next();
                     $chapterRaw = $cells->current()->getValue(); $cells->next();
                     $topicRaw = $cells->current()->getValue(); $cells->next();
                     $objectiveRaw = $cells->current()->getValue();
-    
-                    // Process Section
-                    [$sectionCode, $sectionBody] = array_pad(explode(':', $sectionRaw, 2), 2, null);
+        
+                    $sectionLines = explode("\n", $sectionRaw); // Split sections into lines
 
-                    // dd([$sectionCode, $sectionBody]); // Debugging to ensure the variables are correctly assigned.
-
-                    $section = Section::firstOrCreate([
-                        'subject_id' => $subject->id,
-                        'code' => trim($sectionCode),
-                    ], [
-                        'body' => trim($sectionBody),
-                    ]);
-    
-                    // Process Chapter
-                    [$chapterCode, $chapterBody] = explode(':', $chapterRaw) + [null, null];
+                    foreach ($sectionLines as $sectionLine) {
+                        $sectionLine = trim($sectionLine); // Remove extra spaces
+                        if (empty($sectionLine)) {
+                            continue; // Skip empty lines
+                        }
+                        
+                        [$sectionCode, $sectionBody] = array_pad(preg_split('/[.:]/', $sectionLine, 2), 2, null);
+                        
+                        $sectionCode = trim($sectionCode);
+                        $sectionBody = trim($sectionBody);
+                        
+                        $section = Section::firstOrCreate([
+                            'subject_id' => $subject->id,
+                            'code' => $sectionCode,
+                        ], [
+                            'body' => $sectionBody,
+                        ]);
+                        
+                        if (isset($topicRaw)) { // Ensure $topicsRaw is defined
+                            $topicLines = explode("\n", $topicRaw); // Split topics into lines
+                        
+                            foreach ($topicLines as $topicLine) {
+                                $topicLine = trim($topicLine); // Remove extra spaces
+                                if (empty($topicLine)) {
+                                    continue; // Skip empty lines
+                                }
+                        
+                                [$topicCode, $topicBody] = array_pad(explode('.', $topicLine, 2), 2, null);
+                        
+                                $topicCode = trim($topicCode);
+                                $topicBody = trim($topicBody);
+                        
+                                $topic = Topic::firstOrCreate([
+                                    'subject_id' => $subject->id,
+                                    'section_id' => $section->id, // Link the topic to the current section
+                                    'body' => $topicBody,
+                                ], [
+                                    'code' => $topicCode,
+                                ]);
+                        
+                            }
+                        }
+                    }
+                        
+        
+                    [$chapterCode, $chapterBody] = array_pad(explode('.', $chapterRaw, 2), 2, null);
                     $chapter = Chapter::firstOrCreate([
                         'subject_id' => $subject->id,
                         'body' => trim($chapterBody),
-                    ], [
+                ], [
                         'code' => trim($chapterCode),
                     ]);
-    
-                    // Process Topics
-                    foreach (explode("\n", $topicRaw) as $topic) {
-                        [$topicCode, $topicBody] = explode(':', $topic) + [null, null];
-                        $topic = Topic::firstOrCreate([
-                            'subject_id' => $subject->id,
-                            'section_id' => $section->id,
-                            'body' => trim($topicBody),
-                        ], [
-                            'code' => trim($topicCode),
-                        ]);
-                    }
-    
-                    // Process Objectives
-                    foreach (explode("\n", $objectiveRaw) as $objective) {
-                        [$objectiveCode, $objectiveBody] = explode(':', $objective) + [null, null];
-                        Objective::firstOrCreate([
-                            'topic_id' => $topic->id,
-                            'body' => trim($objectiveBody),
-                        ], [
-                            'code' => trim($objectiveCode),
-                        ]);
-                    }
-                }  DB::commit();
+        
+        
+                $lines = explode("\n", $objectiveRaw);
 
+                // Loop through each line
+                foreach ($lines as $line) {
+                    $line = trim($line); // Remove unnecessary spaces
+                    if (empty($line)) {
+                        continue;
+                    }
+
+                    if (preg_match('/^(i+)\.\s+(.*)$/i', $line, $matches)) {
+                        $objectiveCode = trim($matches[1]);
+                        $objectiveBody = trim($matches[2]);
+
+                        Objective::firstOrCreate([
+                            'topic_id' => $topic->id, 
+                            'body' => $objectiveBody,
+                        ], [
+                            'code' => $objectiveCode,
+                        ]);
+                    }
+                }
+
+            }  
+                DB::commit();
                 return response()->json(['message' => 'Data imported successfully!']);
             } catch (\Exception $e) {
-                DB::rollBack();
+                 DB::rollBack();
                 return response()->json(['error' => $e->getMessage()], 500);
             }
-        
-            
-    }
+    } 
 
     public function importStructureforEng(Request $request)
     {

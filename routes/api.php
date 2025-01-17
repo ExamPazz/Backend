@@ -50,9 +50,9 @@ Route::group(
 
 //        Route::post('questions/import', [CsvImportController::class, 'importQuestions']);
         Route::post('questions/import', [CsvImportController::class, 'importCsv']);
-        Route::post('keys/import/chem', [ImportKeyController::class, 'importStructureForChem']);
-        Route::post('keys/import/Eng', [ImportKeyController::class, 'importStructureForEng']);
-        Route::post('keys/import/Bio', [ImportKeyController::class, 'importStructureForBio']);
+        // Route::post('keys/import/Comm', [ImportKeyController::class, 'importStructureForComm']);
+        // Route::post('keys/import/Eng', [ImportKeyController::class, 'importStructureForEng']);
+        // Route::post('keys/import/Bio', [ImportKeyController::class, 'importStructureForBio']);
         Route::post('keys/import/Gov', [ImportKeyController::class, 'importStructureForGov']);
         Route::post('keys/import/Econ', [ImportKeyController::class, 'importStructureForEcon']);
 
