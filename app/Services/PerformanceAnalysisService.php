@@ -12,7 +12,7 @@ class PerformanceAnalysisService
         $mockExams = MockExam::where('user_id', $user->id)->get();
 
         if ($mockExams->isEmpty()) {
-            throw new \InvalidArgumentException('No mock exams found for the user.');
+            return collect(); 
         }
 
         $totalQuestions = 0;
