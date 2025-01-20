@@ -9,7 +9,13 @@ class SubjectController extends Controller
 {
     public function index()
     {
-        $subjects = Subject::all();
+        $englishSubject = Subject::where('name', 'English')->first();
+
+        if ($englishSubject && !$englishSubject->is_default) {
+            $englishSubject->update(['is_default' => true]);
+        }
+
+        $subjects = Subject::orderByDesc('is_default')->get();
 
         if ($subjects->isEmpty()) {
             return ApiResponse::failure('No subjects found.');       
@@ -19,4 +25,5 @@ class SubjectController extends Controller
             'subjects' => $subjects,
         ]);       
     }
+
 }

@@ -29,20 +29,23 @@ class ExamDetailController extends Controller
          ]);
     }
 
-    public function show($id)
+    public function show()
     {
-        $examDetail = ExamDetail::where('id', $id)->where('user_id', Auth::id())->first();
-        if (! $examDetail){
-         return ApiResponse::failure('Exam data not found');
+        $examDetail = ExamDetail::where('user_id', Auth::id())->first();
+
+        if (! $examDetail) {
+            return ApiResponse::success('No exam data found.', ['data' => []]);
         }
-        return ApiResponse::success('Data fetched Successfully', [
+
+        return ApiResponse::success('Data fetched successfully', [
             'data' => $examDetail
-         ]);
+        ]);
     }
 
-    public function update(UpdateExamDetailRequest $request, $id)
+
+    public function update(UpdateExamDetailRequest $request)
     {
-        $examDetail = ExamDetail::where('id', $id)->where('user_id', Auth::id())->first();
+        $examDetail = ExamDetail::where('user_id', Auth::id())->first();
         if (! $examDetail){
             return ApiResponse::failure('Exam data not found');
         }
@@ -51,7 +54,7 @@ class ExamDetailController extends Controller
         $updatedDetail = $this->examDetailService->update($examDetail, $validatedData);
             return ApiResponse::success('Exam details updated successfully', [
             'data' => $updatedDetail
-         ]);
+        ]);
     }
 
     public function destroy($id)
