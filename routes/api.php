@@ -16,6 +16,7 @@ use App\Http\Controllers\PerfomanceAnalysisController;
 use App\Http\Controllers\PerformanceAnalysisController;
 use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\SubscriptionController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -85,5 +86,13 @@ Route::group(
             Route::get('/user/mock-exams/count', [PerformanceAnalysisController::class, 'getUserMockExamsCount']);
             Route::post('/subscription/initiate', [SubscriptionController::class, 'initiate']);
             Route::get('/subscription/verify', [SubscriptionController::class, 'verify'])->name('subscription.verify');
+
+            Route::prefix('notifications')->group(function () {
+                Route::get('/', [NotificationController::class, 'index']);
+                Route::get('/{id}', [NotificationController::class, 'show']);
+                Route::patch('/{id}/read', [NotificationController::class, 'markAsRead']);
+                Route::patch('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+                Route::delete('/{id}', [NotificationController::class, 'destroy']);
+            });
         });
     });
