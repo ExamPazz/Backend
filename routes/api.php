@@ -15,6 +15,7 @@ use App\Http\Controllers\MockExamController;
 use App\Http\Controllers\PerfomanceAnalysisController;
 use App\Http\Controllers\PerformanceAnalysisController;
 use App\Http\Controllers\SubjectController;
+use App\Http\Controllers\SubscriptionController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -74,5 +75,7 @@ Route::group(
             Route::get('/user/subjects/analysis', [PerformanceAnalysisController::class, 'getOverallSubjectAnalysis']);
             Route::get('/user/mock-exams', [PerformanceAnalysisController::class, 'getUserMockExams']);
             Route::get('/user/mock-exams/count', [PerformanceAnalysisController::class, 'getUserMockExamsCount']);
+            Route::post('/subscription/initiate', [SubscriptionController::class, 'initiate']);
+            Route::get('/subscription/verify', [SubscriptionController::class, 'verify'])->name('subscription.verify');
         });
     });
