@@ -14,7 +14,7 @@ return new class extends Migration {
             $table->id();
             $table->foreignId('section_id')->nullable()->index()->constrained('sections');
             $table->foreignId('subject_id')->nullable()->index()->constrained('subjects');
-            $table->string('body')->nullable();
+            $table->text('body')->nullable();
             $table->string('code');
             $table->timestamps();
         });

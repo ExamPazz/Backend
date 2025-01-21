@@ -11,12 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('chapters', function (Blueprint $table) {
-            $table->id();
-            $table->string('code'); // Roman numerals i-v
-            $table->foreignId('subject_id')->index()->nullable();
-            $table->text('body')->nullable();
-            $table->timestamps();
+        Schema::table('subjects', function (Blueprint $table) {
+            $table->boolean('is_default')->after('name');
         });
     }
 
@@ -25,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('chapters');
+        Schema::table('subjects', function (Blueprint $table) {
+            $table->dropColumn('is_default');
+        });
     }
 };

@@ -239,7 +239,7 @@ class MockExamService
             $totalAnswered = count(array_filter($results, fn($result) => $result['answered']));
             $totalCorrect = count(array_filter($results, fn($result) => $result['is_correct']));
             $totalWrong = $totalQuestions - $totalAnswered - $totalCorrect;
-            $score = ($totalCorrect / $totalQuestions) * 100;
+            $score = ($totalCorrect / $totalQuestions);
 
             MockExam::query()->where('id', $request->mock_exam_id)
                 ->where('user_id', $user->id)
@@ -269,7 +269,7 @@ class MockExamService
             }
             return [
                 'results' => $results,
-                'score' => round($score, 2),
+                'score' => $score,
                 'total_questions' => $totalQuestions,
                 'total_answered' => $totalAnswered,
                 'total_correct' => $totalCorrect,
@@ -462,7 +462,7 @@ class MockExamService
                             ];
                         }),
                         'image_url' => $question->image_url,
-                        'correct_option' => $question->questionOptions->pluck('value'),
+                        'correct_option' => $question->questionOptions->where('is_correct', true)->pluck('value')->first(),  
                         'solution' => $question->solution,
                         'user_answer' => $userAnswer?->selected_option,
                         'is_correct' => $userAnswer?->is_correct,

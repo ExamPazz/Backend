@@ -51,7 +51,13 @@ Route::group(
 
 //        Route::post('questions/import', [CsvImportController::class, 'importQuestions']);
         Route::post('questions/import', [CsvImportController::class, 'importCsv']);
-        Route::post('keys/import', [ImportKeyController::class, 'importCSV']);
+        // Route::post('keys/import/Comm', [ImportKeyController::class, 'importStructureForComm']);
+        // Route::post('keys/import/Eng', [ImportKeyController::class, 'importStructureForEng']);
+        // Route::post('keys/import/Bio', [ImportKeyController::class, 'importStructureForBio']);
+        Route::post('keys/import/Gov', [ImportKeyController::class, 'importStructureForGov']);
+        Route::post('keys/import/Econ', [ImportKeyController::class, 'importStructureForEcon']);
+
+
 
         Route::group(['prefix' => 'subscription-plan'], function () {
             Route::post('store', [SubscriptionPlanController::class, 'store']);
@@ -62,7 +68,9 @@ Route::group(
 
 
         Route::middleware('auth:sanctum')->group(function () {
-            Route::resource('exam-details', ExamDetailController::class)->except(['index']);
+            Route::get('exam-details', [ExamDetailController::class, 'show']);
+            Route::put('exam-details', [ExamDetailController::class, 'update']);
+            Route::resource('exam-details', ExamDetailController::class)->except(['index', 'show', 'update']);
             Route::get('/user/profile', [UserProfileController::class, 'getAuthenticatedUser']);
             Route::put('/user/profile', [UserProfileController::class, 'updateUser']);
             Route::post('/mock-exam', [MockExamController::class, 'generateMockExam']);
