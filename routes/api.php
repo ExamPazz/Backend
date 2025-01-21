@@ -62,6 +62,7 @@ Route::group(
 
         Route::group(['prefix' => 'subscription-plan'], function () {
             Route::post('store', [SubscriptionPlanController::class, 'store']);
+            Route::get('index', [SubscriptionPlanController::class, 'index']);
             Route::get('{uuid}/show', [SubscriptionPlanController::class, 'show']);
             Route::patch('{uuid}/update', [SubscriptionPlanController::class, 'update']);
             Route::delete('{uuid}/delete', [SubscriptionPlanController::class, 'delete']);
