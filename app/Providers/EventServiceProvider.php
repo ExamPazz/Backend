@@ -22,7 +22,7 @@ class EventServiceProvider extends ServiceProvider
      */
     protected $listen = [
         NewUserRegistrationEvent::class => [
-            NewUserRegistrationListener::class
+            NewUserRegistrationListener::class,
         ],
         ResetPasswordEvent::class => [
             ResetPasswordListener::class

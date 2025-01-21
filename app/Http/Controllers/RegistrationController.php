@@ -4,44 +4,30 @@ namespace App\Http\Controllers;
 
 use App\Events\NewUserRegistrationEvent;
 use App\Http\Requests\RegistrationRequest;
-use App\Repository\UserRepository;
+use App\Models\User;
 use App\Support\ApiResponse;
-use App\Support\OtpHelper;
-use App\Models\SubscriptionPlan;
-use App\Models\Subscription;
-
+use Illuminate\Support\Facades\Hash;
 
 class RegistrationController extends Controller
 {
-    public function __construct(
-        public UserRepository $userRepository,
-        public OtpHelper $otpHelper
-    )
-    {
-    }
-
     public function register(RegistrationRequest $request)
     {
-        $user = $this->userRepository->storeUser($request);
-
-         if ($user)
-         {
-            // Assign default subscription plan "Freemium"
-            $freemiumPlan = SubscriptionPlan::where('name', 'Freemium')->first();
-            if ($freemiumPlan) {
-                Subscription::create([
-                    'subscription_plan_id' => $freemiumPlan->id,
-                    'user_id' => $user->id,
-                    'status' => 'active',
-                    'payment_provider_data' => null,
+        try {
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'phone_number' => $request->phone_number,
             ]);
-            $otp = $this->otpHelper->generateOtp($user, 20);
-              event(new NewUserRegistrationEvent($user, $otp['code']));
-             return ApiResponse::success('Account Registration Successful', [
+
+            // Dispatch the event immediately after user creation
+            event(new NewUserRegistrationEvent($user));
+
+            return ApiResponse::success('Registration successful. Please check your email for verification code.', [
                 'user' => $user
-             ]);
-         }
-        return ApiResponse::success('Account Registration Successful');
+            ]);
+        } catch (\Exception $e) {
+            return ApiResponse::failure('Registration failed: ' . $e->getMessage());
+        }
     }
-}
 }

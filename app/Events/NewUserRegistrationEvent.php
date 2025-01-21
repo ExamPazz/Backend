@@ -20,8 +20,7 @@ class NewUserRegistrationEvent
      * Create a new event instance.
      */
     public function __construct(
-        public  User|Model $user,
-        public string $otp
+        public User $user
     )
     {
         //
