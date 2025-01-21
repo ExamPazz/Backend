@@ -21,8 +21,8 @@ class RegistrationController extends Controller
     }
     public function register(RegistrationRequest $request)
     {
-
-        $user = $this->userRepository->storeUser($request);
+        
+            $user = $this->userRepository->storeUser($request);
 
             if ($user)
             {
@@ -33,6 +33,9 @@ class RegistrationController extends Controller
                 ]);
             }
             return ApiResponse::failure('Account Registration Failed');
+
+
+
 
     }
 }
