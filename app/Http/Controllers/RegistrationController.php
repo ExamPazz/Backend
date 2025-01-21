@@ -21,7 +21,7 @@ class RegistrationController extends Controller
     }
     public function register(RegistrationRequest $request)
     {
-        
+
             $user = $this->userRepository->storeUser($request);
 
             if ($user)
