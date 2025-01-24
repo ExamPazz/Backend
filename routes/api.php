@@ -19,6 +19,10 @@ use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\NotificationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Models\User;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
+use Laravel\Socialite\Facades\Socialite;
 
 /*
 |--------------------------------------------------------------------------
@@ -50,6 +54,34 @@ Route::group(
         Route::post('code/send/whatsapp', [OTPController::class, 'sendViaWhatsApp']);
         Route::post('auth/google', [GoogleAuthController::class, 'store']);
 
+        Route::middleware(['web'])->group(function () {
+            Route::get('auth/redirect', function () {
+                return Socialite::driver('google')->redirect();
+            });
+        
+            Route::get('auth/callback', function () {
+                $googleUser = Socialite::driver('google')->stateless()->user();
+                
+                $user = User::updateOrCreate([
+                    'google_id' => $googleUser->id,
+                ], [
+                    'full_name' => $googleUser->name,
+                    'email' => $googleUser->email,
+                    'password' => bcrypt(Str::random(16)),                    
+                    'google_token' => $googleUser->token,
+                    // 'google_refresh_token' => $googleUser->refreshToken,
+                ]);
+        
+                // Auth::login($user);
+        
+                return response()->json([
+                    'message' => 'Authenticated successfully',
+                    'user' => $user,
+                    'token' => $user->createToken('API Token')->plainTextToken,
+                ]);
+            });
+        });
+
 //        Route::post('questions/import', [CsvImportController::class, 'importQuestions']);
         Route::post('questions/import', [CsvImportController::class, 'importCsv']);
         // Route::post('keys/import/Comm', [ImportKeyController::class, 'importStructureForComm']);
@@ -62,6 +94,7 @@ Route::group(
 
         Route::group(['prefix' => 'subscription-plan'], function () {
             Route::post('store', [SubscriptionPlanController::class, 'store']);
+            Route::get('index', [SubscriptionPlanController::class, 'index']);
             Route::get('{uuid}/show', [SubscriptionPlanController::class, 'show']);
             Route::patch('{uuid}/update', [SubscriptionPlanController::class, 'update']);
             Route::delete('{uuid}/delete', [SubscriptionPlanController::class, 'delete']);

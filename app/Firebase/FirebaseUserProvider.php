@@ -31,7 +31,7 @@ class FirebaseUserProvider implements UserProvider
         if ($existingUser == null) {
             $user = User::create([
                 'firebase_uid' => $user->uid,
-                'name' => $user->displayName,
+                'full_name' => $user->displayName,
                 'email' => $user->email,
                 'image' => $user->photoUrl,
                 'phone' => $user->phoneNumber,

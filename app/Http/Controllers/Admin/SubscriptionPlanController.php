@@ -10,6 +10,19 @@ use Illuminate\Validation\Rule;
 
 class SubscriptionPlanController extends Controller
 {
+    public function index()
+    {
+        $allPlans = SubscriptionPlan::all();
+
+        if ($allPlans->isEmpty()) {
+            return ApiResponse::failure('No plan found.');       
+        }
+
+        return ApiResponse::success('All plans retrieved successfully.', [
+            'subscription_plans' => $allPlans,
+        ]);       
+    }
+    
     public function store(Request $request)
     {
         $validated = $request->validate([
