@@ -26,7 +26,8 @@ class User extends Authenticatable
         'password',
         'uuid',
         'agreed_to_terms_of_use',
-        'is_active'
+        'is_active',
+        'google_id'
 
     ];
 
