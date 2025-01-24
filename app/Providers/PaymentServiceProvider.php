@@ -2,8 +2,8 @@
 
 namespace App\Providers;
 
-use App\Interfaces\PaymentProviderInterface;
-use App\Services\Payment\PayStackProvider;
+use App\Contracts\PaymentProviderInterface;
+use App\Services\PaymentProviders\PaystackProvider;
 use Illuminate\Support\ServiceProvider;
 
 class PaymentServiceProvider extends ServiceProvider
@@ -14,6 +14,7 @@ class PaymentServiceProvider extends ServiceProvider
 
     public function register()
     {
+
         $this->app->bind(PaymentProviderInterface::class, function () {
             $provider = config('payment.default');
 

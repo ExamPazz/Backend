@@ -13,7 +13,7 @@ class PaystackProvider implements PaymentProviderInterface
 
     public function __construct()
     {
-        $this->secretKey = config('services.paystack.secret_key');
+        $this->secretKey = config('payment.providers.paystack.secret_key');
     }
 
     public function initiatePayment(array $data): array

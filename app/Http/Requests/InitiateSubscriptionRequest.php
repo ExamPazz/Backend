@@ -14,8 +14,7 @@ class InitiateSubscriptionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'plan_id' => 'required|exists:subscription_plans,id',
-            'amount' => 'required|numeric|min:0',
+            'plan_id' => 'required|exists:subscription_plans,id'
         ];
     }
 }

@@ -49,7 +49,7 @@ class NewUserRegistrationListener implements ShouldQueue
 
             Log::info('OTP generated successfully', ['otp_id' => $otp->id]);
 
-            
+
             // Queue the email
             Mail::to($user->email)
                 ->queue(new VerificationCodeMail($otp->code));

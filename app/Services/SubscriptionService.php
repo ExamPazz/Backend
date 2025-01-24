@@ -29,7 +29,7 @@ class SubscriptionService
             $paymentData = [
                 'email' => $user->email,
                 'amount' => $plan->price,
-                'callback_url' => route('subscription.verify'),
+                'callback_url' => config('payment.providers.paystack.callback_url'),
                 'metadata' => $metadata,
             ];
 
