@@ -20,6 +20,7 @@ use App\Http\Controllers\NotificationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Models\User;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
 
@@ -66,11 +67,12 @@ Route::group(
                 ], [
                     'full_name' => $googleUser->name,
                     'email' => $googleUser->email,
+                    'password' => bcrypt(Str::random(16)),                    
                     'google_token' => $googleUser->token,
-                    'google_refresh_token' => $googleUser->refreshToken,
+                    // 'google_refresh_token' => $googleUser->refreshToken,
                 ]);
         
-                Auth::login($user);
+                // Auth::login($user);
         
                 return response()->json([
                     'message' => 'Authenticated successfully',
