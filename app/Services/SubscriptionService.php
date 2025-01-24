@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\SubscriptionPlan;
 use App\Events\SubscriptionCreated;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class SubscriptionService
 {
@@ -48,7 +49,7 @@ class SubscriptionService
 
             return $response;
         } catch (\Exception $e) {
-            \Log::error('Subscription initiation failed: ' . $e->getMessage());
+            Log::error('Subscription initiation failed: ' . $e->getMessage(), $e->getTrace());
             throw $e;
         }
     }
