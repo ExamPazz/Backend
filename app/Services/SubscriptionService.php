@@ -24,7 +24,7 @@ class SubscriptionService
                 'plan_id' => $data['plan_id'],
             ];
 
-            $plan = SubscriptionPlan::find($data['plan_id']);
+            $plan = SubscriptionPlan::query()->findOrFail($data['plan_id']);
 
             $paymentData = [
                 'email' => $user->email,
