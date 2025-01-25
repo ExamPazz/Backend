@@ -73,10 +73,12 @@ Route::group(
                 ]);
         
                 // Auth::login($user);
-        
+                $hasExamDetail = $user->latestExamDetail()->exists();
+
                 return response()->json([
                     'message' => 'Authenticated successfully',
-                    'user' => $user,
+                    'user' => $user->load('subscription.subscriptionPlan'),
+                    'has_exam_detail' => $hasExamDetail,
                     'token' => $user->createToken('API Token')->plainTextToken,
                 ]);
             });
