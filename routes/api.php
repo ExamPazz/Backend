@@ -54,36 +54,32 @@ Route::group(
         Route::post('code/send/whatsapp', [OTPController::class, 'sendViaWhatsApp']);
         Route::post('auth/google', [GoogleAuthController::class, 'store']);
 
-        Route::middleware(['web'])->group(function () {
-            Route::get('auth/redirect', function () {
-                return Socialite::driver('google')->redirect();
-            });
+        Route::get('auth/callback', function () {
+            $googleUser = Socialite::driver('google')->stateless()->user();
         
-            Route::get('auth/callback', function () {
-                $googleUser = Socialite::driver('google')->stateless()->user();
-                
-                $user = User::updateOrCreate([
+            $user = User::updateOrCreate(
+                [
+                    'email' => $googleUser->email, // Use email as the unique identifier
+                ],
+                [
                     'google_id' => $googleUser->id,
-                ], [
                     'full_name' => $googleUser->name,
-                    'email' => $googleUser->email,
                     'password' => bcrypt(Str::random(16)),                    
                     'google_token' => $googleUser->token,
-                    // 'google_refresh_token' => $googleUser->refreshToken,
-                ]);
+                ]
+            );
         
-                // Auth::login($user);
-                $hasExamDetail = $user->latestExamDetail()->exists();
-
-                return response()->json([
-                    'message' => 'Authenticated successfully',
-                    'user' => $user->load('subscription.subscriptionPlan'),
-                    'has_exam_detail' => $hasExamDetail,
-                    'token' => $user->createToken('API Token')->plainTextToken,
-                ]);
-            });
+            // Auth::login($user);
+            $hasExamDetail = $user->latestExamDetail()->exists();
+        
+            return response()->json([
+                'message' => 'Authenticated successfully',
+                'user' => $user->load('subscription.subscriptionPlan'),
+                'has_exam_detail' => $hasExamDetail,
+                'token' => $user->createToken('API Token')->plainTextToken,
+            ]);
         });
-
+        
 //        Route::post('questions/import', [CsvImportController::class, 'importQuestions']);
         Route::post('questions/import', [CsvImportController::class, 'importCsv']);
         // Route::post('keys/import/Comm', [ImportKeyController::class, 'importStructureForComm']);
