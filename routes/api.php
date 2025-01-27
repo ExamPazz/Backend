@@ -20,6 +20,8 @@ use App\Http\Controllers\NotificationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Models\User;
+use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use Illuminate\Support\Str;
 
 use Illuminate\Support\Facades\Auth;
@@ -77,7 +79,15 @@ Route::group(
             
                 // Auth::login($user);
                 $hasExamDetail = $user->latestExamDetail()->exists();
-            
+                $freemiumPlan = SubscriptionPlan::where('name', 'Freemium')->first();
+
+                if ($freemiumPlan) {
+                    Subscription::create([
+                        'user_id' => $user->id,
+                        'subscription_plan_id' => $freemiumPlan->id,
+                        'expires_at' => now()->addDays(30), // Example: 30-day free period
+                    ]);
+                }
                 return response()->json([
                     'message' => 'Authenticated successfully',
                     'user' => $user->load('subscription.subscriptionPlan'),
