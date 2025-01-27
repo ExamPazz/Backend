@@ -41,7 +41,7 @@ class SubscriptionService
                     'user_id' => $user->id,
                     'reference' => $response['data']['reference'],
                     'status' => 'pending',
-                    'amount' => $data['amount'],
+                    'amount' => $plan->price,
                     'metadata' => $metadata,
                     'provider' => 'paystack'
                 ]);
