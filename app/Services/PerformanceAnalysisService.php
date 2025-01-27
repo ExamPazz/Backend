@@ -62,10 +62,29 @@ class PerformanceAnalysisService
         ];
     }
 
+    public function getMockExamTopicBreakdown($mockExam)
+    {
+        // Group questions by subject and topic
+        $topicBreakdown = $mockExam->mockExamQuestions
+            ->groupBy(['question.subject_id', 'question.topic_id'])
+            ->map(function ($questionsByTopic, $subjectId) {
+                return $questionsByTopic->map(function ($questions, $topicId) {
+                    return [
+                        'topic_id' => $topicId,
+                        'topic_name' => $questions->first()->question->topic->body ?? 'Unknown Topic',
+                        'subject_id' => $questions->first()->question->subject_id,
+                        'subject_name' => $questions->first()->question->subject->name ?? 'Unknown Subject',
+                        'question_count' => $questions->count(), // Correct count of questions from this topic
+                    ];
+                })->values();
+            });
+
+        return $topicBreakdown;
+    }
 
     public function getUserMockExamsWithScores($user)
     {
-        $mockExams = MockExam::with(['mockExamQuestions.question.subject', 'userAnswers'])
+        $mockExams = MockExam::with(['mockExamQuestions.question.subject', 'mockExamQuestions.question.topic', 'userAnswers'])
             ->where('user_id', $user->id)
             ->get();
 
@@ -101,6 +120,8 @@ class PerformanceAnalysisService
                 ];
             })->values();
 
+            $topicBreakdown = $this->getMockExamTopicBreakdown($mockExam);
+
             return [
                 'mock_exam_id' => $mockExam->id,
                 'start_time' => $mockExam->start_time,
@@ -108,6 +129,7 @@ class PerformanceAnalysisService
                 'total_score' => $totalScore,
                 'total_time_spent' => $totalTimeSpent, 
                 'subject_scores' => $subjectScores,
+                'topic_breakdown' => $topicBreakdown,
             ];
         });
 
@@ -182,4 +204,5 @@ class PerformanceAnalysisService
 
         return $result;
     }
+
 }
