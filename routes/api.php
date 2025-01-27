@@ -20,7 +20,10 @@ use App\Http\Controllers\NotificationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Models\User;
+use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use Illuminate\Support\Str;
+
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
 
@@ -58,31 +61,42 @@ Route::group(
             Route::get('auth/redirect', function () {
                 return Socialite::driver('google')->redirect();
             });
-        
             Route::get('auth/callback', function () {
                 $googleUser = Socialite::driver('google')->stateless()->user();
-                
-                $user = User::updateOrCreate([
-                    'google_id' => $googleUser->id,
-                ], [
-                    'full_name' => $googleUser->name,
-                    'email' => $googleUser->email,
-                    'password' => bcrypt(Str::random(16)),                    
-                    'google_token' => $googleUser->token,
-                    // 'google_refresh_token' => $googleUser->refreshToken,
-                ]);
-        
+            
+                $user = User::updateOrCreate(
+                    ['email' => $googleUser->email], 
+                    ['google_id' => $googleUser->id,
+                ],
+    
+                    [
+                        'google_id' => $googleUser->id,
+                        'full_name' => $googleUser->name,
+                        'password' => bcrypt(Str::random(16)),                    
+                        'google_token' => $googleUser->token,
+                    ]
+                );
+            
                 // Auth::login($user);
-        
+                $hasExamDetail = $user->latestExamDetail()->exists();
+                $freemiumPlan = SubscriptionPlan::where('name', 'Freemium')->first();
+
+                if ($freemiumPlan) {
+                    Subscription::create([
+                        'user_id' => $user->id,
+                        'subscription_plan_id' => $freemiumPlan->id,
+                        'expires_at' => now()->addDays(30), // Example: 30-day free period
+                    ]);
+                }
                 return response()->json([
                     'message' => 'Authenticated successfully',
-                    'user' => $user,
+                    'user' => $user->load('subscription.subscriptionPlan'),
+                    'has_exam_detail' => $hasExamDetail,
                     'token' => $user->createToken('API Token')->plainTextToken,
                 ]);
             });
         });
-
-//        Route::post('questions/import', [CsvImportController::class, 'importQuestions']);
+        // Route::post('questions/import', [CsvImportController::class, 'importQuestions']);
         Route::post('questions/import', [CsvImportController::class, 'importCsv']);
         // Route::post('keys/import/Comm', [ImportKeyController::class, 'importStructureForComm']);
         // Route::post('keys/import/Eng', [ImportKeyController::class, 'importStructureForEng']);
