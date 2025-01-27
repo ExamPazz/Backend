@@ -58,9 +58,10 @@ Route::group(
             $googleUser = Socialite::driver('google')->stateless()->user();
         
             $user = User::updateOrCreate(
-                [
-                    'email' => $googleUser->email, // Use email as the unique identifier
-                ],
+                ['email' => $googleUser->email], 
+                ['google_id' => $googleUser->id,
+            ],
+
                 [
                     'google_id' => $googleUser->id,
                     'full_name' => $googleUser->name,
