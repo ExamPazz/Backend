@@ -21,6 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Models\User;
 use Illuminate\Support\Str;
+
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
 
@@ -58,7 +59,6 @@ Route::group(
             Route::get('auth/redirect', function () {
                 return Socialite::driver('google')->redirect();
             });
-        
             Route::get('auth/callback', function () {
                 $googleUser = Socialite::driver('google')->stateless()->user();
             
@@ -84,9 +84,9 @@ Route::group(
                     'has_exam_detail' => $hasExamDetail,
                     'token' => $user->createToken('API Token')->plainTextToken,
                 ]);
+            });
         });
-
-//        Route::post('questions/import', [CsvImportController::class, 'importQuestions']);
+        // Route::post('questions/import', [CsvImportController::class, 'importQuestions']);
         Route::post('questions/import', [CsvImportController::class, 'importCsv']);
         // Route::post('keys/import/Comm', [ImportKeyController::class, 'importStructureForComm']);
         // Route::post('keys/import/Eng', [ImportKeyController::class, 'importStructureForEng']);
