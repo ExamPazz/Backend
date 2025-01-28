@@ -65,10 +65,8 @@ class SubscriptionService
 
                     $subscription = Subscription::create([
                         'user_id' => $metadata['user_id'],
-                        'plan_id' => $metadata['plan_id'],
-                        'status' => 'active',
-                        'allowed_number_attempts' => 5, // You might want to get this from plan details
-                        'created_at' => now(),
+                        'subscription_plan_id' => $metadata['plan_id'],
+                        'status' => 'active'
                     ]);
 
                     Transaction::where('reference', $response['data']['reference'])
@@ -93,7 +91,7 @@ class SubscriptionService
                 'message' => 'Payment verification failed'
             ];
         } catch (\Exception $e) {
-            \Log  ::error('Subscription verification failed: ' . $e->getMessage());
+            Log::error('Subscription verification failed: ' . $e->getMessage());
             throw $e;
         }
     }
