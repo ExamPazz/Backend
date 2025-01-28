@@ -28,7 +28,6 @@ class User extends Authenticatable
         'agreed_to_terms_of_use',
         'is_active',
         'google_id'
-
     ];
 
     protected $with = [
