@@ -126,6 +126,7 @@ Route::group(
             Route::resource('subjects', SubjectController::class);
             Route::get('/user/analysis', [PerformanceAnalysisController::class, 'getUserExamAnalysis']);
             Route::get('/user/subjects/analysis', [PerformanceAnalysisController::class, 'getOverallSubjectAnalysis']);
+            Route::get('/user/subjects-performance', [PerformanceAnalysisController::class, 'getUserSubjectsPerformance']);
             Route::get('/user/mock-exams', [PerformanceAnalysisController::class, 'getUserMockExams']);
             Route::get('/user/mock-exams/count', [PerformanceAnalysisController::class, 'getUserMockExamsCount']);
             Route::post('/subscription/initiate', [SubscriptionController::class, 'initiate']);

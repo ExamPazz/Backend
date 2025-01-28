@@ -205,4 +205,48 @@ class PerformanceAnalysisService
         return $result;
     }
 
+    public function getUserSubjectsPerformance($user)
+    {
+        $mockExams = MockExam::with(['mockExamQuestions.question.subject', 'userAnswers'])
+            ->where('user_id', $user->id)
+            ->get();
+
+        $subjectPerformance = $mockExams->flatMap(function ($mockExam) {
+            return $mockExam->mockExamQuestions->groupBy('question.subject_id')->map(function ($questions, $subjectId) use ($mockExam) {
+                $totalSubjectQuestions = $questions->count();
+                $correctAnswers = $questions->filter(function ($question) use ($mockExam) {
+                    return $mockExam->userAnswers->where('question_id', $question->question_id)->where('is_correct', true)->isNotEmpty();
+                })->count();
+
+                $score = $totalSubjectQuestions > 0 ? ($correctAnswers / $totalSubjectQuestions) * 100 : 0;
+
+                return [
+                    'subject_id' => $subjectId,
+                    'subject_name' => $questions->first()->question->subject->name ?? 'Unknown Subject',
+                    'score' => $score
+                ];
+            });
+        });
+
+        // Calculate average scores for each subject
+        $averageScores = $subjectPerformance->groupBy('subject_id')->map(function ($scores, $subjectId) {
+            $averageScore = collect($scores)->avg('score');
+
+            return [
+                'subject_id' => $subjectId,
+                'subject_name' => $scores[0]['subject_name'],
+                'average_score' => $averageScore
+            ];
+        })->values();
+
+        // Find the weakest and strongest subjects
+        $weakSubject = $averageScores->sortBy('average_score')->first(); // Lowest score
+        $strongSubject = $averageScores->sortByDesc('average_score')->first(); // Highest score
+
+        return [
+            'strong_subject' => $strongSubject,
+            'weak_subject' => $weakSubject,
+        ];
+    }  
+
 }
