@@ -63,6 +63,17 @@ class SubscriptionService
                 return DB::transaction(function () use ($response) {
                     $metadata = $response['data']['metadata'];
 
+                    $current_sub = Subscription::query()->latest()->firstWhere('user_id', $metadata['user_id']);
+                    if ($current_sub && $current_sub->status == 'active')
+                    {
+                       if (is_null($current_sub->subscriptionPlan->allowed_number_of_attempts))
+                       {
+                           $current_sub->update([
+                               'status' => 'inactive'
+                           ]);
+                       }
+                    }
+                    
                     $subscription = Subscription::create([
                         'user_id' => $metadata['user_id'],
                         'subscription_plan_id' => $metadata['plan_id'],
