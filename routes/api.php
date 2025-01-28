@@ -64,19 +64,16 @@ Route::group(
             Route::get('auth/callback', function () {
                 $googleUser = Socialite::driver('google')->stateless()->user();
             
-                $user = User::updateOrCreate(
-                    ['email' => $googleUser->email], 
-                    ['google_id' => $googleUser->id,
-                ],
-    
-                    [
-                        'google_id' => $googleUser->id,
-                        'full_name' => $googleUser->name,
-                        'password' => bcrypt(Str::random(16)),                    
-                        'google_token' => $googleUser->token,
-                    ]
-                );
-            
+                    $user = User::updateOrCreate(
+                        ['email' => $googleUser->email], 
+                        [
+                            'google_id' => $googleUser->id,
+                            'full_name' => $googleUser->name,
+                            'password' => bcrypt(Str::random(16)),                    
+                            'google_token' => $googleUser->token,
+                        ]
+                    );
+                                
                 // Auth::login($user);
                 $hasExamDetail = $user->latestExamDetail()->exists();
                 $freemiumPlan = SubscriptionPlan::where('name', 'Freemium')->first();
