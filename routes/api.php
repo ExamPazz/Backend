@@ -76,7 +76,7 @@ Route::group(
                                 
                 // Auth::login($user);
                 $hasExamDetail = $user->latestExamDetail()->exists();
-                $freemiumPlan = SubscriptionPlan::where('name', 'Freemium')->first();
+                $freemiumPlan = SubscriptionPlan::where('name', 'freemium')->first();
 
                 if ($freemiumPlan) {
                     Subscription::create([
