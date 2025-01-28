@@ -5,8 +5,9 @@ namespace App\Listeners;
 use App\Events\SubscriptionCreated;
 use App\Mail\SubscriptionConfirmation;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Contracts\Queue\ShouldQueue;
 
-class SendSubscriptionConfirmationEmail
+class SendSubscriptionConfirmationEmail implements ShouldQueue
 {
     public function handle(SubscriptionCreated $event): void
     {
