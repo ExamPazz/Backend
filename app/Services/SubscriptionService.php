@@ -89,6 +89,9 @@ class SubscriptionService
 
                     event(new SubscriptionCreated($subscription));
 
+                    $user = User::find($metadata['user_id']);
+                    $user->refresh(); 
+                    
                     return [
                         'success' => true,
                         'message' => 'Subscription created successfully',
