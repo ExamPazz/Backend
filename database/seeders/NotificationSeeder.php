@@ -41,7 +41,7 @@ class NotificationSeeder extends Seeder
 
         foreach ($users as $user) {
             // Generate 5-10 random notifications for each user
-            $numberOfNotifications = rand(5, 10);
+            $numberOfNotifications = rand(30, 40);
 
             for ($i = 0; $i < $numberOfNotifications; $i++) {
                 $type = array_rand($this->notificationTypes);

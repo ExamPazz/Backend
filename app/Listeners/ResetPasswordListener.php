@@ -5,7 +5,6 @@ namespace App\Listeners;
 use App\Events\ResetPasswordEvent;
 use App\Notifications\ResetPasswordNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Queue\InteractsWithQueue;
 
 class ResetPasswordListener implements ShouldQueue
 {

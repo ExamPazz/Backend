@@ -31,7 +31,7 @@ class SubscriptionConfirmation extends Mailable
             with: [
                 'subscription' => $this->subscription,
                 'user' => $this->subscription->user,
-                'plan_name' => $this->subscription->name,
+                'plan_name' => $this->subscription->subscriptionPlan->name,
             ],
         );
     }
