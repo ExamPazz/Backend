@@ -56,6 +56,8 @@ Route::group(
         Route::post('password/reset/code/resend', [ResetPasswordController::class, 'resendOtp']);
         Route::post('code/send/whatsapp', [OTPController::class, 'sendViaWhatsApp']);
         Route::post('auth/google', [GoogleAuthController::class, 'store']);
+        Route::post('/user/restore', [UserProfileController::class, 'restore']);
+
 
         Route::middleware(['web'])->group(function () {
             Route::get('auth/redirect', function () {

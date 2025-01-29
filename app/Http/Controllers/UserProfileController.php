@@ -6,6 +6,8 @@ use App\Support\ApiResponse;
 use Illuminate\Http\Request;
 use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\UserResource;
+use Illuminate\Support\Facades\Auth;
+use App\Models\User;
 
 class UserProfileController extends Controller
 {
@@ -39,5 +41,22 @@ class UserProfileController extends Controller
         $user->delete();
 
         return ApiResponse::success('User account deleted successfullyy');
+    }
+
+    public function restore(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email|exists:users,email',
+        ]);
+
+        $user = User::withTrashed()->where('email', $request->email)->first();
+
+        if (!$user->trashed()) {
+            return ApiResponse::failure('User account is already active');
+        }
+
+        $user->restore();
+
+        return ApiResponse::success('User account restored successfully');
     }
 }
