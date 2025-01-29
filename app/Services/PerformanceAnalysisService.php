@@ -64,17 +64,24 @@ class PerformanceAnalysisService
 
     public function getMockExamTopicBreakdown($mockExam)
     {
-        // Group questions by subject and topic
         $topicBreakdown = $mockExam->mockExamQuestions
             ->groupBy(['question.subject_id', 'question.topic_id'])
-            ->map(function ($questionsByTopic, $subjectId) {
-                return $questionsByTopic->map(function ($questions, $topicId) {
+            ->map(function ($questionsByTopic, $subjectId) use ($mockExam) {
+                return $questionsByTopic->map(function ($questions, $topicId) use ($mockExam) {
+                    $correctAnswers = $questions->filter(function ($question) use ($mockExam) {
+                        return $mockExam->userAnswers
+                            ->where('question_id', $question->question_id)
+                            ->where('is_correct', true)
+                            ->isNotEmpty();
+                    })->count();
+
                     return [
                         'topic_id' => $topicId,
                         'topic_name' => $questions->first()->question->topic->body ?? 'Unknown Topic',
                         'subject_id' => $questions->first()->question->subject_id,
                         'subject_name' => $questions->first()->question->subject->name ?? 'Unknown Subject',
-                        'question_count' => $questions->count(), // Correct count of questions from this topic
+                        'question_count' => $questions->count(), 
+                        'score' => $correctAnswers, 
                     ];
                 })->values();
             });
