@@ -27,4 +27,17 @@ class UserProfileController extends Controller
 
         return ApiResponse::success('User data updated successfully', new UserResource($user));
     }
+
+    public function deleteUserAccount(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return ApiResponse::failure('User data not found');
+        }
+
+        $user->delete();
+
+        return ApiResponse::success('User account deleted successfullyy');
+    }
 }
