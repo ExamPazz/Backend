@@ -62,10 +62,36 @@ class PerformanceAnalysisService
         ];
     }
 
+    public function getMockExamTopicBreakdown($mockExam)
+    {
+        $topicBreakdown = $mockExam->mockExamQuestions
+            ->groupBy(['question.subject_id', 'question.topic_id'])
+            ->map(function ($questionsByTopic, $subjectId) use ($mockExam) {
+                return $questionsByTopic->map(function ($questions, $topicId) use ($mockExam) {
+                    $correctAnswers = $questions->filter(function ($question) use ($mockExam) {
+                        return $mockExam->userAnswers
+                            ->where('question_id', $question->question_id)
+                            ->where('is_correct', true)
+                            ->isNotEmpty();
+                    })->count();
+
+                    return [
+                        'topic_id' => $topicId,
+                        'topic_name' => $questions->first()->question->topic->body ?? 'Unknown Topic',
+                        'subject_id' => $questions->first()->question->subject_id,
+                        'subject_name' => $questions->first()->question->subject->name ?? 'Unknown Subject',
+                        'question_count' => $questions->count(), 
+                        'score' => $correctAnswers, 
+                    ];
+                })->values();
+            });
+
+        return $topicBreakdown;
+    }
 
     public function getUserMockExamsWithScores($user)
     {
-        $mockExams = MockExam::with(['mockExamQuestions.question.subject', 'userAnswers'])
+        $mockExams = MockExam::with(['mockExamQuestions.question.subject', 'mockExamQuestions.question.topic', 'userAnswers'])
             ->where('user_id', $user->id)
             ->get();
 
@@ -101,6 +127,8 @@ class PerformanceAnalysisService
                 ];
             })->values();
 
+            $topicBreakdown = $this->getMockExamTopicBreakdown($mockExam);
+
             return [
                 'mock_exam_id' => $mockExam->id,
                 'start_time' => $mockExam->start_time,
@@ -108,6 +136,7 @@ class PerformanceAnalysisService
                 'total_score' => $totalScore,
                 'total_time_spent' => $totalTimeSpent, 
                 'subject_scores' => $subjectScores,
+                'topic_breakdown' => $topicBreakdown,
             ];
         });
 
@@ -182,4 +211,49 @@ class PerformanceAnalysisService
 
         return $result;
     }
+
+    public function getUserSubjectsPerformance($user)
+    {
+        $mockExams = MockExam::with(['mockExamQuestions.question.subject', 'userAnswers'])
+            ->where('user_id', $user->id)
+            ->get();
+
+        $subjectPerformance = $mockExams->flatMap(function ($mockExam) {
+            return $mockExam->mockExamQuestions->groupBy('question.subject_id')->map(function ($questions, $subjectId) use ($mockExam) {
+                $totalSubjectQuestions = $questions->count();
+                $correctAnswers = $questions->filter(function ($question) use ($mockExam) {
+                    return $mockExam->userAnswers->where('question_id', $question->question_id)->where('is_correct', true)->isNotEmpty();
+                })->count();
+
+                $score = $totalSubjectQuestions > 0 ? ($correctAnswers / $totalSubjectQuestions) * 100 : 0;
+
+                return [
+                    'subject_id' => $subjectId,
+                    'subject_name' => $questions->first()->question->subject->name ?? 'Unknown Subject',
+                    'score' => $score
+                ];
+            });
+        });
+
+        // Calculate average scores for each subject
+        $averageScores = $subjectPerformance->groupBy('subject_id')->map(function ($scores, $subjectId) {
+            $averageScore = collect($scores)->avg('score');
+
+            return [
+                'subject_id' => $subjectId,
+                'subject_name' => $scores[0]['subject_name'],
+                'average_score' => $averageScore
+            ];
+        })->values();
+
+        // Find the weakest and strongest subjects
+        $weakSubject = $averageScores->sortBy('average_score')->first(); // Lowest score
+        $strongSubject = $averageScores->sortByDesc('average_score')->first(); // Highest score
+
+        return [
+            'strong_subject' => $strongSubject,
+            'weak_subject' => $weakSubject,
+        ];
+    }  
+
 }

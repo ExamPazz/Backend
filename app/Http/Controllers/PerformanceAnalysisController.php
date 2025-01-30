@@ -53,4 +53,13 @@ class PerformanceAnalysisController extends Controller
         return ApiResponse::success('User subjects analysis generated successfully', $result);
     }
 
+    public function getUserSubjectsPerformance(Request $request)
+    {
+        $user = $request->user(); 
+
+        $result = $this->performanceAnalysisService->getUserSubjectsPerformance($user);
+
+        return ApiResponse::success('User weak and strong subjects generated successfully', $result);
+    }
+
 }

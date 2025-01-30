@@ -27,7 +27,7 @@ class RegistrationController extends Controller
             if ($user)
             {
                 $otp = $this->otpHelper->generateOtp($user, 20);
-                event(new NewUserRegistrationEvent($user, $otp['code']));
+                event(new NewUserRegistrationEvent($user));
                 return ApiResponse::success('Account Registration Successful', [
                    'user' => $user
                 ]);

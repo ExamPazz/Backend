@@ -10,10 +10,11 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable, \Illuminate\Auth\MustVerifyEmail;
+    use HasApiTokens, SoftDeletes, HasFactory, Notifiable, \Illuminate\Auth\MustVerifyEmail;
 
     /**
      * The attributes that are mass assignable.
@@ -28,7 +29,6 @@ class User extends Authenticatable
         'agreed_to_terms_of_use',
         'is_active',
         'google_id'
-
     ];
 
     protected $with = [
@@ -65,11 +65,10 @@ class User extends Authenticatable
         return $this->hasOne(Otp::class);
     }
 
-    public function subscription(): HasOne
+    public function subscription()
     {
-        return $this->hasOne(Subscription::class);
+        return $this->hasOne(Subscription::class)->latestOfMany();
     }
-
 
     protected static function boot()
     {

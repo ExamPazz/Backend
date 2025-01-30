@@ -6,6 +6,8 @@ use App\Support\ApiResponse;
 use Illuminate\Http\Request;
 use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\UserResource;
+use Illuminate\Support\Facades\Auth;
+use App\Models\User;
 
 class UserProfileController extends Controller
 {
@@ -26,5 +28,35 @@ class UserProfileController extends Controller
         $user->userProfile()->update($request->only(['phone_number', 'region', 'city', 'nationality', 'age','gender','date_of_birth']));
 
         return ApiResponse::success('User data updated successfully', new UserResource($user));
+    }
+
+    public function deleteUserAccount(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return ApiResponse::failure('User data not found');
+        }
+
+        $user->delete();
+
+        return ApiResponse::success('User account deleted successfullyy');
+    }
+
+    public function restore(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email|exists:users,email',
+        ]);
+
+        $user = User::withTrashed()->where('email', $request->email)->first();
+
+        if (!$user->trashed()) {
+            return ApiResponse::failure('User account is already active');
+        }
+
+        $user->restore();
+
+        return ApiResponse::success('User account restored successfully');
     }
 }

@@ -41,7 +41,7 @@ class SubscriptionService
                     'user_id' => $user->id,
                     'reference' => $response['data']['reference'],
                     'status' => 'pending',
-                    'amount' => $data['amount'],
+                    'amount' => $plan->price,
                     'metadata' => $metadata,
                     'provider' => 'paystack'
                 ]);
@@ -63,12 +63,21 @@ class SubscriptionService
                 return DB::transaction(function () use ($response) {
                     $metadata = $response['data']['metadata'];
 
+                    $current_sub = Subscription::query()->latest()->firstWhere('user_id', $metadata['user_id']);
+                    if ($current_sub && $current_sub->status == 'active')
+                    {
+                       if (is_null($current_sub->subscriptionPlan->allowed_number_of_attempts))
+                       {
+                           $current_sub->update([
+                               'status' => 'inactive'
+                           ]);
+                       }
+                    }
+
                     $subscription = Subscription::create([
                         'user_id' => $metadata['user_id'],
-                        'plan_id' => $metadata['plan_id'],
-                        'status' => 'active',
-                        'allowed_number_attempts' => 5, // You might want to get this from plan details
-                        'created_at' => now(),
+                        'subscription_plan_id' => $metadata['plan_id'],
+                        'status' => 'active'
                     ]);
 
                     Transaction::where('reference', $response['data']['reference'])
@@ -79,6 +88,9 @@ class SubscriptionService
                         ]);
 
                     event(new SubscriptionCreated($subscription));
+
+                    $user = User::find($metadata['user_id']);
+                    $user->refresh();
 
                     return [
                         'success' => true,
@@ -93,7 +105,7 @@ class SubscriptionService
                 'message' => 'Payment verification failed'
             ];
         } catch (\Exception $e) {
-            \Log  ::error('Subscription verification failed: ' . $e->getMessage());
+            Log::error('Subscription verification failed: ' . $e->getMessage());
             throw $e;
         }
     }

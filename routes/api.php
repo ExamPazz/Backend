@@ -17,6 +17,7 @@ use App\Http\Controllers\PerformanceAnalysisController;
 use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PaystackWebhookController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Models\User;
@@ -56,6 +57,8 @@ Route::group(
         Route::post('password/reset/code/resend', [ResetPasswordController::class, 'resendOtp']);
         Route::post('code/send/whatsapp', [OTPController::class, 'sendViaWhatsApp']);
         Route::post('auth/google', [GoogleAuthController::class, 'store']);
+        Route::post('/user/restore', [UserProfileController::class, 'restore']);
+
 
         Route::middleware(['web'])->group(function () {
             Route::get('auth/redirect', function () {
@@ -63,23 +66,20 @@ Route::group(
             });
             Route::get('auth/callback', function () {
                 $googleUser = Socialite::driver('google')->stateless()->user();
-            
-                $user = User::updateOrCreate(
-                    ['email' => $googleUser->email], 
-                    ['google_id' => $googleUser->id,
-                ],
-    
-                    [
-                        'google_id' => $googleUser->id,
-                        'full_name' => $googleUser->name,
-                        'password' => bcrypt(Str::random(16)),                    
-                        'google_token' => $googleUser->token,
-                    ]
-                );
-            
+
+                    $user = User::updateOrCreate(
+                        ['email' => $googleUser->email],
+                        [
+                            'google_id' => $googleUser->id,
+                            'full_name' => $googleUser->name,
+                            'password' => bcrypt(Str::random(16)),
+                            'google_token' => $googleUser->token,
+                        ]
+                    );
+
                 // Auth::login($user);
                 $hasExamDetail = $user->latestExamDetail()->exists();
-                $freemiumPlan = SubscriptionPlan::where('name', 'Freemium')->first();
+                $freemiumPlan = SubscriptionPlan::where('name', 'freemium')->first();
 
                 if ($freemiumPlan) {
                     Subscription::create([
@@ -121,6 +121,7 @@ Route::group(
             Route::resource('exam-details', ExamDetailController::class)->except(['index', 'show', 'update']);
             Route::get('/user/profile', [UserProfileController::class, 'getAuthenticatedUser']);
             Route::put('/user/profile', [UserProfileController::class, 'updateUser']);
+            Route::delete('/user/delete', [UserProfileController::class, 'deleteUserAccount']);
             Route::post('/mock-exam', [MockExamController::class, 'generateMockExam']);
             Route::post('/mock-exam/answers', [MockExamController::class, 'storeUserAnswer']);
             Route::post('/mock-exam/{mockExamId}/calculate', [MockExamController::class, 'calculateScore']);
@@ -129,6 +130,7 @@ Route::group(
             Route::resource('subjects', SubjectController::class);
             Route::get('/user/analysis', [PerformanceAnalysisController::class, 'getUserExamAnalysis']);
             Route::get('/user/subjects/analysis', [PerformanceAnalysisController::class, 'getOverallSubjectAnalysis']);
+            Route::get('/user/subjects-performance', [PerformanceAnalysisController::class, 'getUserSubjectsPerformance']);
             Route::get('/user/mock-exams', [PerformanceAnalysisController::class, 'getUserMockExams']);
             Route::get('/user/mock-exams/count', [PerformanceAnalysisController::class, 'getUserMockExamsCount']);
             Route::post('/subscription/initiate', [SubscriptionController::class, 'initiate']);
@@ -142,4 +144,6 @@ Route::group(
                 Route::delete('/{id}', [NotificationController::class, 'destroy']);
             });
         });
+
+        Route::post('webhook/paystack', [PaystackWebhookController::class, 'handle']);
     });
