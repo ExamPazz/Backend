@@ -153,30 +153,37 @@ class PerformanceAnalysisService
         $mockExams = MockExam::with(['mockExamQuestions.question.subject', 'userAnswers'])
             ->where('user_id', $user->id)
             ->get();
-
+    
         if ($mockExams->isEmpty()) {
             return collect(); 
         }
-
+    
         $subjectAnalysis = collect();
-
+        $totalTimeSpent = 0; // Total time spent across all exams
+        $totalAnsweredQuestions = 0;
+        $totalExams = $mockExams->count();
+    
         foreach ($mockExams as $mockExam) {
-            $subjectData = $mockExam->mockExamQuestions->groupBy('subject_id')->map(function ($questions, $subjectId) use ($mockExam) {
+            $examTimeSpent = $mockExam->average_time_per_exam ?? 0; // Time in seconds
+            $totalTimeSpent += $examTimeSpent;
+    
+            $subjectData = $mockExam->mockExamQuestions->groupBy('subject_id')->map(function ($questions, $subjectId) use ($mockExam, &$totalAnsweredQuestions) {
                 $totalSubjectQuestions = $questions->count();
                 $userAnswers = $mockExam->userAnswers;
-
+    
                 $correctAnswers = $questions->filter(function ($question) use ($userAnswers) {
                     return $userAnswers->where('question_id', $question->question_id)->where('is_correct', true)->isNotEmpty();
                 })->count();
-
+    
                 $attemptedQuestions = $questions->filter(function ($question) use ($userAnswers) {
                     return $userAnswers->where('question_id', $question->question_id)->isNotEmpty();
                 })->count();
-
+    
                 $skippedQuestions = $totalSubjectQuestions - $attemptedQuestions;
-
                 $score = $totalSubjectQuestions > 0 ? ($correctAnswers / $totalSubjectQuestions) * 100 : 0;
-
+    
+                $totalAnsweredQuestions += $attemptedQuestions; // Count total answered questions for time calculation
+    
                 return [
                     'subject_id' => $subjectId,
                     'subject_name' => $questions->first()->question->subject->name,
@@ -186,19 +193,23 @@ class PerformanceAnalysisService
                     'skipped_questions' => $skippedQuestions,
                 ];
             });
-
+    
             $subjectAnalysis = $subjectAnalysis->merge($subjectData);
         }
-
+    
+        // Calculate average time per exam and per question
+        $averageTimePerExam = $totalExams > 0 ? round($totalTimeSpent / $totalExams) : 0;
+        $averageTimePerQuestion = $totalAnsweredQuestions > 0 ? round($totalTimeSpent / $totalAnsweredQuestions) : 0;
+    
         // Combine and calculate averages for each subject
         $result = $subjectAnalysis->groupBy('subject_id')->map(function ($subjectData) {
-                $totalCorrectAnswers = $subjectData->sum('correct_answers');
-                $totalAttemptedQuestions = $subjectData->sum('attempted_questions');
-                $totalSkippedQuestions = $subjectData->sum('skipped_questions');
-                $totalQuestions = $totalCorrectAnswers + $totalSkippedQuestions;
-
-                $averageScore = $totalQuestions > 0 ? ($totalCorrectAnswers / $totalQuestions) * 100 : 0;
-
+            $totalCorrectAnswers = $subjectData->sum('correct_answers');
+            $totalAttemptedQuestions = $subjectData->sum('attempted_questions');
+            $totalSkippedQuestions = $subjectData->sum('skipped_questions');
+            $totalQuestions = $totalCorrectAnswers + $totalSkippedQuestions;
+    
+            $averageScore = $totalQuestions > 0 ? ($totalCorrectAnswers / $totalQuestions) * 100 : 0;
+    
             return [
                 'subject_id' => $subjectData->first()['subject_id'],
                 'subject_name' => $subjectData->first()['subject_name'],
@@ -208,8 +219,12 @@ class PerformanceAnalysisService
                 'total_skipped_questions' => $totalSkippedQuestions,
             ];
         })->values();
-
-        return $result;
+    
+        return [
+            'subjects' => $result,
+            'average_time_per_exam' => $averageTimePerExam,
+            'average_time_per_question' => $averageTimePerQuestion,
+        ];
     }
 
     public function getUserSubjectsPerformance($user)

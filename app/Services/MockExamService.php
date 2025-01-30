@@ -432,19 +432,21 @@ class MockExamService
             'mockExamQuestions.question.questionOptions',
             'mockExamQuestions.question.topic',
             'mockExamQuestions.question.objective',
+            'mockExamQuestions.question.subject',
             'userAnswers',
         ])
             ->where('id', $mockExamId)
             ->where('user_id', $user->id)
             ->firstOrFail();
 
-        $groupedQuestions = $mockExam->mockExamQuestions->groupBy('question.subject.name');
+        // Ensure questions are retrieved in the correct order
+        $groupedQuestions = $mockExam->mockExamQuestions->sortBy('id')->groupBy('question.subject.id');
 
-        return $groupedQuestions->map(function ($questions, $subjectName) use ($mockExam) {
+        return $groupedQuestions->map(function ($questions, $subjectId) use ($mockExam) {
             return [
                 'subject' => [
-                    'name' => $subjectName,
-                    'id' => $questions->first()->question->subject->id,
+                    'id' => $subjectId,
+                    'name' => $questions->first()->question->subject->name,
                 ],
                 'questions' => $questions->map(function ($mockExamQuestion) use ($mockExam) {
                     $question = $mockExamQuestion->question;
@@ -460,15 +462,16 @@ class MockExamService
                                 'id' => $option->id,
                                 'value' => $option->value,
                             ];
-                        }),
+                        })->values(), 
                         'image_url' => $question->image_url,
                         'correct_option' => $question->questionOptions->where('is_correct', true)->pluck('value')->first(),  
                         'solution' => $question->solution,
                         'user_answer' => $userAnswer?->selected_option,
                         'is_correct' => $userAnswer?->is_correct,
                     ];
-                })->toArray(),
+                })->values(),
             ];
         })->values();
     }
+
 }
