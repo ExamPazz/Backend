@@ -73,7 +73,7 @@ class SubscriptionService
                            ]);
                        }
                     }
-                    
+
                     $subscription = Subscription::create([
                         'user_id' => $metadata['user_id'],
                         'subscription_plan_id' => $metadata['plan_id'],
@@ -90,8 +90,8 @@ class SubscriptionService
                     event(new SubscriptionCreated($subscription));
 
                     $user = User::find($metadata['user_id']);
-                    $user->refresh(); 
-                    
+                    $user->refresh();
+
                     return [
                         'success' => true,
                         'message' => 'Subscription created successfully',

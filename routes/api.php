@@ -17,6 +17,7 @@ use App\Http\Controllers\PerformanceAnalysisController;
 use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PaystackWebhookController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Models\User;
@@ -63,17 +64,17 @@ Route::group(
             });
             Route::get('auth/callback', function () {
                 $googleUser = Socialite::driver('google')->stateless()->user();
-            
+
                     $user = User::updateOrCreate(
-                        ['email' => $googleUser->email], 
+                        ['email' => $googleUser->email],
                         [
                             'google_id' => $googleUser->id,
                             'full_name' => $googleUser->name,
-                            'password' => bcrypt(Str::random(16)),                    
+                            'password' => bcrypt(Str::random(16)),
                             'google_token' => $googleUser->token,
                         ]
                     );
-                                
+
                 // Auth::login($user);
                 $hasExamDetail = $user->latestExamDetail()->exists();
                 $freemiumPlan = SubscriptionPlan::where('name', 'freemium')->first();
@@ -141,4 +142,6 @@ Route::group(
                 Route::delete('/{id}', [NotificationController::class, 'destroy']);
             });
         });
+
+        Route::post('webhook/paystack', [PaystackWebhookController::class, 'handle']);
     });
