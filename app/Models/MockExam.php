@@ -16,6 +16,7 @@ class MockExam extends Model
     protected $casts = [
         'start_time' => 'datetime',
         'end_time' => 'datetime',
+        'question_order' => 'array',
     ];
 
 
