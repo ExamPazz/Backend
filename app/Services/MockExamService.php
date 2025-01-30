@@ -427,61 +427,63 @@ class MockExamService
 
 
     public function getMockExamDetails($user, $mockExamId)
-    {
-        $mockExam = MockExam::with([
-            'mockExamQuestions' => function ($query) {
-                $query->orderBy('id'); // Ensures questions are fetched in original insertion order
-            },
-            'mockExamQuestions.question.questionOptions',
-            'mockExamQuestions.question.topic',
-            'mockExamQuestions.question.objective',
-            'mockExamQuestions.question.subject',
-            'userAnswers',
-        ])
-            ->where('id', $mockExamId)
-            ->where('user_id', $user->id)
-            ->firstOrFail();
+{
+    $mockExam = MockExam::with([
+        'mockExamQuestions' => function ($query) {
+            $query->orderBy('id'); // Ensures questions are fetched in original insertion order
+        },
+        'mockExamQuestions.question.questionOptions',
+        'mockExamQuestions.question.topic',
+        'mockExamQuestions.question.objective',
+        'mockExamQuestions.question.subject',
+        'userAnswers',
+    ])
+        ->where('id', $mockExamId)
+        ->where('user_id', $user->id)
+        ->firstOrFail();
 
-        // Preserve order by iterating directly
-        $orderedQuestions = $mockExam->mockExamQuestions->map(function ($mockExamQuestion) use ($mockExam) {
-            $question = $mockExamQuestion->question;
-            $userAnswer = $mockExam->userAnswers
-                ->where('question_id', $question->id)
-                ->first();
-
-            return [
-                'id' => $question->id,
-                'subject_id' => $question->subject->id,
-                'subject_name' => $question->subject->name,
-                'question' => $question->question,
-                'options' => $question->questionOptions->whereNotNull('value')->map(function ($option) {
-                    return [
-                        'id' => $option->id,
-                        'value' => $option->value,
-                    ];
-                })->values(),
-                'image_url' => $question->image_url,
-                'correct_option' => $question->questionOptions->where('is_correct', true)->pluck('value')->first(),  
-                'solution' => $question->solution,
-                'user_answer' => $userAnswer?->selected_option,
-                'is_correct' => $userAnswer?->is_correct,
-            ];
-        });
-
-        // If grouping by subject is required while keeping order intact:
-        $groupedQuestions = $orderedQuestions->groupBy('subject_id')->map(function ($questions, $subjectId) {
-            return [
-                'subject' => [
-                    'id' => $subjectId,
-                    'name' => $questions->first()['subject_name'],
-                ],
-                'questions' => $questions->values(),
-            ];
-        })->values();
+    // Preserve order by iterating directly
+    $orderedQuestions = $mockExam->mockExamQuestions->map(function ($mockExamQuestion) use ($mockExam) {
+        $question = $mockExamQuestion->question;
+        $userAnswer = $mockExam->userAnswers
+            ->where('question_id', $question->id)
+            ->first();
 
         return [
-            'mock_exam_id' => $mockExam->id,
-            'questions' => $groupedQuestions,
+            'id' => $question->id,
+            'subject_id' => $question->subject->id,
+            'subject_name' => $question->subject->name,
+            'question' => $question->question,
+            'options' => $question->questionOptions->whereNotNull('value')->map(function ($option) {
+                return [
+                    'id' => $option->id,
+                    'value' => $option->value,
+                ];
+            })->values(),
+            'image_url' => $question->image_url,
+            'correct_option' => $question->questionOptions->where('is_correct', true)->pluck('value')->first(),  
+            'solution' => $question->solution,
+            'user_answer' => $userAnswer?->selected_option,
+            'is_correct' => $userAnswer?->is_correct,
         ];
-    }
+    });
+
+    // If grouping by subject is required while keeping order intact:
+    $groupedQuestions = $orderedQuestions->groupBy('subject_id')->map(function ($questions, $subjectId) {
+        return [
+            'subject' => [
+                'id' => $subjectId,
+                'name' => $questions->first()['subject_name'],
+            ],
+            'questions' => $questions->values(),
+        ];
+    })->values();
+
+    return [
+        'mock_exam_id' => $mockExam->id,
+        'questions' => $groupedQuestions,
+    ];
+}
+
+
 }
