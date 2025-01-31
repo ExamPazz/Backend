@@ -58,6 +58,7 @@ class MockExamService
                 'user_id' => $user->id,
                 'start_time' => now(),
                 'end_time' => now()->addMinutes(90), // 1 hour 30 minutes
+                'question_order' => [] // Initialize empty array
             ]);
 
             foreach ($subjects_ids as $subject_id) {
@@ -133,10 +134,24 @@ class MockExamService
                 ];
             }
 
+            // Store the order information
+            $questionOrder = [];
+            foreach ($groupedQuestions as $subjectName => $subjectData) {
+                $questionOrder[$subjectName] = [
+                    'questions' => collect($subjectData['questions'])->map(function ($q) {
+                        return [
+                            'id' => $q['id'],
+                            'options' => collect($q['options'])->pluck('id')->toArray()
+                        ];
+                    })->toArray()
+                ];
+            }
+
+            $mockExam->update(['question_order' => $questionOrder]);
+
             DB::commit();
 
             $groupedQuestions = ['questions' => $groupedQuestions, 'mock_exam_id' => $mockExam->id];
-
             Cache::put($cacheKey, $groupedQuestions, now()->addHours(2));
 
             return $groupedQuestions;
@@ -432,43 +447,73 @@ class MockExamService
             'mockExamQuestions.question.questionOptions',
             'mockExamQuestions.question.topic',
             'mockExamQuestions.question.objective',
+            'mockExamQuestions.question.subject',
             'userAnswers',
         ])
             ->where('id', $mockExamId)
             ->where('user_id', $user->id)
             ->firstOrFail();
 
-        $groupedQuestions = $mockExam->mockExamQuestions->groupBy('question.subject.name');
+        $questionOrder = $mockExam->question_order;
 
-        return $groupedQuestions->map(function ($questions, $subjectName) use ($mockExam) {
+        $groupedQuestions = $mockExam->mockExamQuestions
+            ->sortBy('id')
+            ->groupBy('question.subject.id');
+
+        return $groupedQuestions->map(function ($questions, $subjectId) use ($mockExam, $questionOrder) {
+            $subjectName = $questions->first()->question->subject->name;
+            $subjectOrder = $questionOrder[ucwords($subjectName)] ?? [];
+
+            // Get original question order for this subject
+            $originalQuestionOrder = collect($subjectOrder['questions'] ?? [])->pluck('id');
+
             return [
                 'subject' => [
+                    'id' => $subjectId,
                     'name' => $subjectName,
-                    'id' => $questions->first()->question->subject->id,
                 ],
-                'questions' => $questions->map(function ($mockExamQuestion) use ($mockExam) {
-                    $question = $mockExamQuestion->question;
-                    $userAnswer = $mockExam->userAnswers
-                        ->where('question_id', $question->id)
-                        ->first();
+                'questions' => $questions
+                    ->sortBy(function ($mockExamQuestion) use ($originalQuestionOrder) {
+                        return $originalQuestionOrder->search($mockExamQuestion->question_id);
+                    })
+                    ->map(function ($mockExamQuestion) use ($mockExam, $questionOrder, $subjectName) {
+                        $question = $mockExamQuestion->question;
+                        $userAnswer = $mockExam->userAnswers
+                            ->where('question_id', $question->id)
+                            ->first();
 
-                    return [
-                        'id' => $question->id,
-                        'question' => $question->question,
-                        'options' => $question->questionOptions->whereNotNull('value')->map(function ($option) {
-                            return [
-                                'id' => $option->id,
-                                'value' => $option->value,
-                            ];
-                        }),
-                        'image_url' => $question->image_url,
-                        'correct_option' => $question->questionOptions->where('is_correct', true)->pluck('value')->first(),  
-                        'solution' => $question->solution,
-                        'user_answer' => $userAnswer?->selected_option,
-                        'is_correct' => $userAnswer?->is_correct,
-                    ];
-                })->toArray(),
+                        // Find original option order
+                        $questionOrderData = collect($questionOrder[ucwords($subjectName)]['questions'] ?? [])
+                            ->firstWhere('id', $question->id);
+                        $originalOptionOrder = $questionOrderData['options'] ?? [];
+
+                        return [
+                            'id' => $question->id,
+                            'question' => $question->question,
+                            'options' => $question->questionOptions
+                                ->whereNotNull('value')
+                                ->sortBy(function ($option) use ($originalOptionOrder) {
+                                    return array_search($option->id, $originalOptionOrder);
+                                })
+                                ->map(function ($option) {
+                                    return [
+                                        'id' => $option->id,
+                                        'value' => $option->value,
+                                    ];
+                                })
+                                ->values(),
+                            'image_url' => $question->image_url,
+                            'correct_option' => $question->questionOptions
+                                ->where('is_correct', true)
+                                ->pluck('value')
+                                ->first(),
+                            'solution' => $question->solution,
+                            'user_answer' => $userAnswer?->selected_option,
+                            'is_correct' => $userAnswer?->is_correct,
+                        ];
+                    })->values(),
             ];
         })->values();
     }
+
 }
