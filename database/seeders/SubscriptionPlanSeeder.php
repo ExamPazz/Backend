@@ -16,7 +16,7 @@ class SubscriptionPlanSeeder extends Seeder
     {
        SubscriptionPlan::query()->create(
            [
-               'name' => 'Freemium',
+               'name' => 'freemium',
                'price' => 0,
                'allowed_number_of_questions' => 5,
                'allowed_number_of_attempts' => 1
@@ -24,7 +24,7 @@ class SubscriptionPlanSeeder extends Seeder
 
        SubscriptionPlan::query()->create(
            [
-               'name' => 'Standard',
+               'name' => 'standard',
                'price' => 10000
            ]);
     }
