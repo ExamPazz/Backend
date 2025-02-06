@@ -12,55 +12,57 @@ class PerformanceAnalysisService
     public function getUserExamStatistics($user)
     {
         $mockExams = MockExam::where('user_id', $user->id)->get();
-
+    
         if ($mockExams->isEmpty()) {
             return collect();
         }
-
+    
         $totalQuestions = 0;
         $totalAnsweredQuestions = 0;
         $totalCorrectAnswers = 0;
         $totalExamScores = 0;
         $totalTimeSpent = 0; // Total time spent in seconds
         $totalExams = $mockExams->count();
-
+    
         foreach ($mockExams as $mockExam) {
             $userAnswers = UserExamAnswer::where('mock_exam_id', $mockExam->id)
                 ->where('user_id', $user->id)
                 ->get();
-
+    
             $mockExamQuestionsCount = $mockExam->mockExamQuestions->count();
             $correctAnswers = $userAnswers->where('is_correct', true)->count();
-            $examTimeSpent = $mockExam->average_time_per_exam ?? 0; // Time in seconds sent by frontend
-
+    
+            // Sum up time spent from the user_answers table
+            $examTimeSpent = $userAnswers->sum('time_spent'); // Ensure `time_spent` exists in user_answers
+    
             $totalQuestions += $mockExamQuestionsCount;
             $totalAnsweredQuestions += $userAnswers->count();
             $totalCorrectAnswers += $correctAnswers;
             $totalTimeSpent += $examTimeSpent;
-
+    
             if ($mockExamQuestionsCount > 0) {
                 $examScore = ($correctAnswers / $mockExamQuestionsCount) * 100;
                 $totalExamScores += $examScore;
             }
         }
-
+    
         $normalizedTotalCorrectAnswers = min($totalCorrectAnswers, 400);
-
+    
         $averageScore = $normalizedTotalCorrectAnswers;
-
         $skippedQuestions = $totalQuestions - $totalAnsweredQuestions;
-
+    
+        // Calculate average times
         $averageTimePerExam = $totalExams > 0 ? round($totalTimeSpent / $totalExams) : 0;
         $averageTimePerQuestion = $totalAnsweredQuestions > 0 ? round($totalTimeSpent / $totalAnsweredQuestions) : 0;
-
+    
         return [
-            'average_score' => $averageScore, // Average score over 400
+            'average_score' => $averageScore,
             'total_questions' => $totalQuestions,
             'answered_questions' => $totalAnsweredQuestions,
             'correct_answers' => $totalCorrectAnswers,
             'skipped_questions' => $skippedQuestions,
             'average_time_per_exam' => $averageTimePerExam,
-            'average_time_per_question' => $averageTimePerQuestion,
+            'average_time_per_question' => $averageTimePerQuestion
         ];
     }
 
