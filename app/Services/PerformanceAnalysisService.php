@@ -298,44 +298,52 @@ class PerformanceAnalysisService
                     $totalQuestions = $topic['question_count'];
                     $correctAnswers = $topic['score'];
 
-                    // Calculate accuracy
                     $accuracy = ($totalQuestions > 0) ? ($correctAnswers / $totalQuestions) * 100 : 0;
 
                     // Store only if accuracy is below 40%
                     if ($accuracy < 40) {
-                        $weakArea = WeakArea::firstOrCreate([
+                        $weakArea = WeakArea::firstOrNew([
                             'user_id' => $user->id,
                             'subject_id' => $topic['subject_id'],
                             'topic_id' => $topic['topic_id'],
                         ]);
 
                         // Update cumulative data
-                        $weakArea->total_questions += $totalQuestions;
-                        $weakArea->correct_answers += $correctAnswers;
+                        $weakArea->total_questions = ($weakArea->exists) ? $weakArea->total_questions + $totalQuestions : $totalQuestions;
+                        $weakArea->correct_answers = ($weakArea->exists) ? $weakArea->correct_answers + $correctAnswers : $correctAnswers;
+
                         $weakArea->save();
                     }
                 }
             }
         }
+    
     }
+
     public function getUserWeakAreas($user)
     {
-        // Auto-update weak areas before fetching
         $this->updateUserWeakAreas($user);
 
-        return WeakArea::where('user_id', $user->id)
+        $weakAreas = WeakArea::where('user_id', $user->id)
             ->with(['subject', 'topic'])
             ->get()
-            ->map(function ($weakArea) {
+            ->groupBy('subject_id') // Group by subject
+            ->map(function ($weakTopics, $subjectId) {
                 return [
-                    'subject_name' => $weakArea->subject->name,
-                    'topic_name' => $weakArea->topic->body,
-                    'total_questions' => $weakArea->total_questions,
-                    'correct_answers' => $weakArea->correct_answers,
-                    'accuracy' => $weakArea->total_questions > 0 
-                        ? round(($weakArea->correct_answers / $weakArea->total_questions) * 100, 2) 
-                        : 0,
+                    'subject_name' => $weakTopics->first()->subject->name, // Get subject name
+                    'topics' => $weakTopics->map(function ($weakArea) {
+                        return [
+                            'topic_name' => $weakArea->topic->body,
+                            'total_questions' => $weakArea->total_questions,
+                            'correct_answers' => $weakArea->correct_answers,
+                            'accuracy' => $weakArea->total_questions > 0 
+                                ? round(($weakArea->correct_answers / $weakArea->total_questions) * 100, 2) 
+                                : 0,
+                        ];
+                    })->values(),
                 ];
-            });
-    }
+            })
+            ->values(); // Ensure it's returned as an indexed array
+
+        return $weakAreas;}
 }

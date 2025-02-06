@@ -26,6 +26,7 @@ use App\Models\User;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use Illuminate\Support\Str;
+use App\Http\Controllers\UtmeDateController;
 
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
@@ -157,4 +158,7 @@ Route::group(
         });
 
         Route::post('contact', [ContactFormController::class, 'submit']);
+
+        Route::post('/utme-date', [UtmeDateController::class, 'store']);
+        Route::get('/utme-date', [UtmeDateController::class, 'show']); 
     });
