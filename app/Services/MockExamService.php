@@ -62,10 +62,11 @@ class MockExamService
             ]);
 
             foreach ($subjects_ids as $subject_id) {
+                $subject = Subject::findOrFail($subject_id);
                 $selectedQuestionIds = Question::query()
                     ->where('subject_id', $subject_id)
                     ->inRandomOrder()
-                    ->limit(50)
+                    ->limit($subject->number_of_questions) // Use subject-specific question count
                     ->pluck('id')
                     ->toArray();
 
@@ -300,41 +301,52 @@ class MockExamService
         }
     }
 
-    public function storeUserAnswer($user, $data)
-    {
-        $question = Question::find($data['question_id']);
-        $selectedOption = json_encode($data['selected_option']);
-        $isCorrect = $selectedOption === $question->questionOptions->pluck('value')->first();
-
-        UserExamAnswer::updateOrCreate(
-            [
-                'mock_exam_id' => $data['mock_exam_id'],
-                'user_id' => $user->id,
-                'question_id' => $data['question_id'],
-            ],
-            [
-                'selected_option' => $data['selected_option'],
-                'is_correct' => $isCorrect,
-            ]
-        );
-
-        return ['is_correct' => $isCorrect];
-    }
 
     public function calculateScore($user, $mockExamId)
     {
-        $userAnswers = UserExamAnswer::where('mock_exam_id', $mockExamId)
+        $mockExam = MockExam::with([
+            'mockExamQuestions.question.subject',
+            'userAnswers'
+        ])
+            ->where('id', $mockExamId)
             ->where('user_id', $user->id)
-            ->get();
+            ->firstOrFail();
 
-        $totalQuestions = $userAnswers->count();
-        $correctAnswers = $userAnswers->where('is_correct', true)->count();
-        $score = $totalQuestions > 0 ? ($correctAnswers / $totalQuestions) * 400 : 0;
+        // Group questions and answers by subject
+        $subjectScores = $mockExam->mockExamQuestions
+            ->groupBy('question.subject_id')
+            ->map(function ($questions) use ($mockExam) {
+                $subjectId = $questions->first()->question->subject_id;
+                $totalQuestions = $questions->count();
+
+                // Get correct answers for this subject
+                $correctAnswers = $mockExam->userAnswers
+                    ->where('is_correct', true)
+                    ->whereIn('question_id', $questions->pluck('question_id'))
+                    ->count();
+
+                // Calculate score for this subject (out of 100)
+                $scorePerQuestion = 100 / $totalQuestions;
+                $subjectScore = $correctAnswers * $scorePerQuestion;
+
+                return [
+                    'subject_name' => $questions->first()->question->subject->name,
+                    'total_questions' => $totalQuestions,
+                    'correct_answers' => $correctAnswers,
+                    'score' => round($subjectScore) // Rounded to whole number
+                ];
+            });
+
+        // Calculate total score (out of 400)
+        $totalScore = $subjectScores->sum('score');
+        $totalQuestions = $mockExam->mockExamQuestions->count();
+        $totalCorrect = $mockExam->userAnswers->where('is_correct', true)->count();
 
         return [
+            'total_score' => round($totalScore), // Rounded to whole number
             'total_questions' => $totalQuestions,
-            'correct_answers' => $correctAnswers,
-            'score' => round($score, 2),
+            'total_correct' => $totalCorrect,
+            'subject_scores' => $subjectScores->values()->toArray()
         ];
     }
 
@@ -441,6 +453,8 @@ class MockExamService
     }
 
 
+
+
     public function getMockExamDetails($user, $mockExamId)
     {
         $mockExam = MockExam::with([
@@ -456,11 +470,18 @@ class MockExamService
 
         $questionOrder = $mockExam->question_order;
 
+        // Group questions by subject and calculate time spent
+        $subjectTimeSpent = $mockExam->userAnswers
+            ->groupBy('question.subject.id')
+            ->map(function ($answers) {
+                return $answers->sum('time_spent');
+            });
+
         $groupedQuestions = $mockExam->mockExamQuestions
             ->sortBy('id')
             ->groupBy('question.subject.id');
 
-        return $groupedQuestions->map(function ($questions, $subjectId) use ($mockExam, $questionOrder) {
+        return $groupedQuestions->map(function ($questions, $subjectId) use ($mockExam, $questionOrder, $subjectTimeSpent) {
             $subjectName = $questions->first()->question->subject->name;
             $subjectOrder = $questionOrder[ucwords($subjectName)] ?? [];
 
@@ -471,6 +492,7 @@ class MockExamService
                 'subject' => [
                     'id' => $subjectId,
                     'name' => $subjectName,
+                    'total_time_spent' => $subjectTimeSpent[$subjectId] ?? 0, // Add total time spent for subject
                 ],
                 'questions' => $questions
                     ->sortBy(function ($mockExamQuestion) use ($originalQuestionOrder) {
@@ -510,6 +532,7 @@ class MockExamService
                             'solution' => $question->solution,
                             'user_answer' => $userAnswer?->selected_option,
                             'is_correct' => $userAnswer?->is_correct,
+                            'time_spent' => $userAnswer?->time_spent ?? 0,
                         ];
                     })->values(),
             ];
