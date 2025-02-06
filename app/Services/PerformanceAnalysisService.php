@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\MockExam;
 use App\Models\UserExamAnswer;
+use App\Models\WeakArea;
+
 
 class PerformanceAnalysisService
 {
@@ -284,4 +286,56 @@ class PerformanceAnalysisService
         ];
     }
 
+    private function updateUserWeakAreas($user)
+    {
+        $mockExams = $user->mockExams()->with(['mockExamQuestions.question.topic', 'userAnswers'])->get();
+
+        foreach ($mockExams as $mockExam) {
+            $topicBreakdown = $this->getMockExamTopicBreakdown($mockExam);
+
+            foreach ($topicBreakdown as $subjectId => $topics) {
+                foreach ($topics as $topic) {
+                    $totalQuestions = $topic['question_count'];
+                    $correctAnswers = $topic['score'];
+
+                    // Calculate accuracy
+                    $accuracy = ($totalQuestions > 0) ? ($correctAnswers / $totalQuestions) * 100 : 0;
+
+                    // Store only if accuracy is below 40%
+                    if ($accuracy < 40) {
+                        $weakArea = WeakArea::firstOrCreate([
+                            'user_id' => $user->id,
+                            'subject_id' => $topic['subject_id'],
+                            'topic_id' => $topic['topic_id'],
+                        ]);
+
+                        $weakArea->total_questions += $totalQuestions;
+                        $weakArea->correct_answers += $correctAnswers;
+                        $weakArea->save();
+                    }
+                }
+            }
+        }
+    }
+
+    public function getUserWeakAreas($user)
+    {
+        // Auto-update weak areas before fetching
+        $this->updateUserWeakAreas($user);
+
+        WeakArea::where('user_id', $user->id)
+            ->with(['subject', 'topic'])
+            ->get()
+            ->map(function ($weakArea) {
+                return [
+                    'subject_name' => $weakArea->subject->name,
+                    'topic_name' => $weakArea->topic->body,
+                    'total_questions' => $weakArea->total_questions,
+                    'correct_answers' => $weakArea->correct_answers,
+                    'accuracy' => $weakArea->total_questions > 0 
+                        ? round(($weakArea->correct_answers / $weakArea->total_questions) * 100, 2) 
+                        : 0,
+                ];
+            });
+    }
 }

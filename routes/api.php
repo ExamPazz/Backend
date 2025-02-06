@@ -136,6 +136,7 @@ Route::group(
             Route::get('/user/subjects-performance', [PerformanceAnalysisController::class, 'getUserSubjectsPerformance']);
             Route::get('/user/mock-exams', [PerformanceAnalysisController::class, 'getUserMockExams']);
             Route::get('/user/mock-exams/count', [PerformanceAnalysisController::class, 'getUserMockExamsCount']);
+            Route::get('/user/weak-area', [PerformanceAnalysisController::class, 'getUserWeakAreas']);
             Route::post('/subscription/initiate', [SubscriptionController::class, 'initiate']);
             Route::get('/subscription/verify', [SubscriptionController::class, 'verify'])->name('subscription.verify');
 
