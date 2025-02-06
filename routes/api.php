@@ -18,6 +18,8 @@ use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaystackWebhookController;
+use App\Http\Controllers\NewsletterController;
+use App\Http\Controllers\ContactFormController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Models\User;
@@ -147,4 +149,11 @@ Route::group(
         });
 
         Route::post('webhook/paystack', [PaystackWebhookController::class, 'handle']);
+
+        Route::prefix('newsletter')->group(function () {
+            Route::post('subscribe', [NewsletterController::class, 'subscribe']);
+            Route::get('unsubscribe/{email}', [NewsletterController::class, 'unsubscribe']);
+        });
+
+        Route::post('contact', [ContactFormController::class, 'submit']);
     });
