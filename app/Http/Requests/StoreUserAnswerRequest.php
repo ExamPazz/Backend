@@ -50,6 +50,7 @@ class StoreUserAnswerRequest extends FormRequest
                     }
                 }
             ],
+            'answers.*.time_spent' => ['nullable', 'integer', 'min:0']
         ];
     }
 }
