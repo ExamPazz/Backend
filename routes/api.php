@@ -148,6 +148,8 @@ Route::group(
                 Route::patch('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
                 Route::delete('/{id}', [NotificationController::class, 'destroy']);
             });
+            Route::post('/utme-date', [UtmeDateController::class, 'store']);
+            Route::get('/utme-date', [UtmeDateController::class, 'show']); 
         });
 
         Route::post('webhook/paystack', [PaystackWebhookController::class, 'handle']);
@@ -159,6 +161,4 @@ Route::group(
 
         Route::post('contact', [ContactFormController::class, 'submit']);
 
-        Route::post('/utme-date', [UtmeDateController::class, 'store']);
-        Route::get('/utme-date', [UtmeDateController::class, 'show']); 
     });
