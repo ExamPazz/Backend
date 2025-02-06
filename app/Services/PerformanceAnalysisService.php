@@ -309,6 +309,7 @@ class PerformanceAnalysisService
                             'topic_id' => $topic['topic_id'],
                         ]);
 
+                        // Update cumulative data
                         $weakArea->total_questions += $totalQuestions;
                         $weakArea->correct_answers += $correctAnswers;
                         $weakArea->save();
@@ -317,13 +318,12 @@ class PerformanceAnalysisService
             }
         }
     }
-
     public function getUserWeakAreas($user)
     {
         // Auto-update weak areas before fetching
         $this->updateUserWeakAreas($user);
 
-        WeakArea::where('user_id', $user->id)
+        return WeakArea::where('user_id', $user->id)
             ->with(['subject', 'topic'])
             ->get()
             ->map(function ($weakArea) {
