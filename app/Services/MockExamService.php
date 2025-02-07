@@ -64,11 +64,17 @@ class MockExamService
             foreach ($subjects_ids as $subject_id) {
                 $subject = Subject::findOrFail($subject_id);
                 $selectedQuestionIds = Question::query()
-                    ->where('subject_id', $subject_id)
-                    ->inRandomOrder()
-                    ->limit($subject->number_of_questions) // Use subject-specific question count
-                    ->pluck('id')
-                    ->toArray();
+                ->where('subject_id', $subject_id)
+                ->select('id')
+                ->inRandomOrder()
+                ->get()
+                ->groupBy('topic_id') // Group by topic
+                ->map(function ($questions) use ($subject) {
+                    return $questions->random(min($questions->count(), ceil($subject->number_of_questions / 4))); // Distribute across 4 topics
+                })
+                ->flatten()
+                ->pluck('id')
+                ->toArray();
 
                 if (empty($selectedQuestionIds)) {
                     throw new \RuntimeException("No questions found for subject ID: {$subject_id}");
