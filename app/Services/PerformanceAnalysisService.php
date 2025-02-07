@@ -104,7 +104,7 @@ class PerformanceAnalysisService
             $totalQuestions = $mockExam->mockExamQuestions->count();
             $userAnswers = $mockExam->userAnswers;
 
-            $totalScore = $userAnswers->where('is_correct', true)->count() / ($totalQuestions > 0 ? $totalQuestions : 1);
+            $totalScore = intval(round($userAnswers->where('is_correct', true)->count() / ($totalQuestions > 0 ? $totalQuestions : 1) * 100));
 
             $totalTimeSpent = $mockExam->end_time->diffInMinutes($mockExam->start_time);
 
