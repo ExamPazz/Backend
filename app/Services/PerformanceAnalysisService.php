@@ -61,8 +61,8 @@ class PerformanceAnalysisService
             'answered_questions' => $totalAnsweredQuestions,
             'correct_answers' => $totalCorrectAnswers,
             'skipped_questions' => $skippedQuestions,
-            'average_time_per_exam' => gmdate('H:i:s', $averageTimePerExam),
-            'average_time_per_question' => gmdate('H:i:s', $averageTimePerQuestion)
+            'average_time_per_exam' => gmdate('i:s', $averageTimePerExam),
+            'average_time_per_question' => gmdate('i:s', $averageTimePerQuestion)
         ];
     }
 
@@ -234,8 +234,8 @@ class PerformanceAnalysisService
             'total_correct_answers' => $totalCorrectAnswers,
             'total_attempted_questions' => $totalAttemptedQuestions,
             'total_skipped_questions' => $totalSkippedQuestions,
-            'average_time_per_exam' => gmdate('H:i:s', $averageTimePerExam),
-            'average_time_per_question' => gmdate('H:i:s', $averageTimePerQuestion)
+            'average_time_per_exam' => gmdate('i:s', $averageTimePerExam),
+            'average_time_per_question' => gmdate('i:s', $averageTimePerQuestion)
         ];
     })->values();
 
