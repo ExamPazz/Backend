@@ -107,6 +107,8 @@ Route::group(
         Route::post('keys/import/Gov', [ImportKeyController::class, 'importStructureForGov']);
         Route::post('keys/import/Econ', [ImportKeyController::class, 'importStructureForEcon']);
         Route::post('keys/import/bio', [ImportKeyController::class, 'importStructureForBio']);
+        Route::post('keys/import/eng', [ImportKeyController::class, 'importStructureForEng']);
+        Route::post('keys/import/lit-eng', [ImportKeyController::class, 'importStructureForLiteng']);
 
 
 
