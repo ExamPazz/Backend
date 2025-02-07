@@ -34,8 +34,8 @@ class UtmeDateController extends Controller
 
         $utmeDate = UtmeDate::where('user_id', $user->id)->first();
 
-        if (!$utmeDate) {
-            return ApiResponse::failure('UTME exam date not found');
+        if (! $utmeDate) {
+            return ApiResponse::success('UTME exam date not found', ['data' => []]);
         }
 
         return ApiResponse::success('UTME exam date saved successfully', $utmeDate);
