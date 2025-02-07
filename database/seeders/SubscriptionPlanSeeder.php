@@ -24,8 +24,8 @@ class SubscriptionPlanSeeder extends Seeder
 
        SubscriptionPlan::query()->create(
            [
-               'name' => 'standard',
-               'price' => 10000
+               'name' => 'Standard',
+               'price' => 5000
            ]);
     }
 }

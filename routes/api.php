@@ -18,12 +18,15 @@ use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaystackWebhookController;
+use App\Http\Controllers\NewsletterController;
+use App\Http\Controllers\ContactFormController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Models\User;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use Illuminate\Support\Str;
+use App\Http\Controllers\UtmeDateController;
 
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
@@ -104,6 +107,8 @@ Route::group(
         Route::post('keys/import/Gov', [ImportKeyController::class, 'importStructureForGov']);
         Route::post('keys/import/Econ', [ImportKeyController::class, 'importStructureForEcon']);
         Route::post('keys/import/bio', [ImportKeyController::class, 'importStructureForBio']);
+        Route::post('keys/import/eng', [ImportKeyController::class, 'importStructureForEng']);
+        Route::post('keys/import/lit-eng', [ImportKeyController::class, 'importStructureForLiteng']);
 
 
 
@@ -134,6 +139,7 @@ Route::group(
             Route::get('/user/subjects-performance', [PerformanceAnalysisController::class, 'getUserSubjectsPerformance']);
             Route::get('/user/mock-exams', [PerformanceAnalysisController::class, 'getUserMockExams']);
             Route::get('/user/mock-exams/count', [PerformanceAnalysisController::class, 'getUserMockExamsCount']);
+            Route::get('/user/weak-area', [PerformanceAnalysisController::class, 'getUserWeakAreas']);
             Route::post('/subscription/initiate', [SubscriptionController::class, 'initiate']);
             Route::get('/subscription/verify', [SubscriptionController::class, 'verify'])->name('subscription.verify');
 
@@ -144,7 +150,17 @@ Route::group(
                 Route::patch('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
                 Route::delete('/{id}', [NotificationController::class, 'destroy']);
             });
+            Route::post('/utme-date', [UtmeDateController::class, 'store']);
+            Route::get('/utme-date', [UtmeDateController::class, 'show']); 
         });
 
         Route::post('webhook/paystack', [PaystackWebhookController::class, 'handle']);
+
+        Route::prefix('newsletter')->group(function () {
+            Route::post('subscribe', [NewsletterController::class, 'subscribe']);
+            Route::get('unsubscribe/{email}', [NewsletterController::class, 'unsubscribe']);
+        });
+
+        Route::post('contact', [ContactFormController::class, 'submit']);
+
     });

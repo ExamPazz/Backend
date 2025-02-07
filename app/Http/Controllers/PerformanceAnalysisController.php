@@ -62,4 +62,13 @@ class PerformanceAnalysisController extends Controller
         return ApiResponse::success('User weak and strong subjects generated successfully', $result);
     }
 
+    public function getUserWeakAreas(Request $request)
+    {
+        $user = $request->user(); 
+
+        $result = $this->performanceAnalysisService->getUserWeakAreas($user);
+
+        return ApiResponse::success('User weak areas generated successfully', $result);
+    }
+
 }
