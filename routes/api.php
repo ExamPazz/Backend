@@ -65,39 +65,43 @@ Route::group(
 
         Route::middleware(['web'])->group(function () {
             Route::get('auth/redirect', function () {
+                session(['redirect_url' => url()->previous()]); // Store previous URL
                 return Socialite::driver('google')->redirect();
             });
+            
             Route::get('auth/callback', function () {
                 $googleUser = Socialite::driver('google')->stateless()->user();
-
-                    $user = User::updateOrCreate(
-                        ['email' => $googleUser->email],
-                        [
-                            'google_id' => $googleUser->id,
-                            'full_name' => $googleUser->name,
-                            'password' => bcrypt(Str::random(16)),
-                            'google_token' => $googleUser->token,
-                        ]
-                    );
-
-                // Auth::login($user);
+            
+                $user = User::updateOrCreate(
+                    ['email' => $googleUser->email],
+                    [
+                        'google_id' => $googleUser->id,
+                        'full_name' => $googleUser->name,
+                        'password' => bcrypt(Str::random(16)),
+                        'google_token' => $googleUser->token,
+                    ]
+                );
+            
                 $hasExamDetail = $user->latestExamDetail()->exists();
                 $freemiumPlan = SubscriptionPlan::where('name', 'freemium')->first();
-
+            
                 if ($freemiumPlan) {
                     Subscription::create([
                         'user_id' => $user->id,
                         'subscription_plan_id' => $freemiumPlan->id,
-                        'expires_at' => now()->addDays(30), // Example: 30-day free period
+                        'expires_at' => now()->addDays(30),
                     ]);
                 }
-                return response()->json([
+            
+                $redirectUrl = session('redirect_url', url('/dashboard')); // Default to dashboard if no previous URL
+            
+                return redirect($redirectUrl)->with([
                     'message' => 'Authenticated successfully',
                     'user' => $user->load('subscription.subscriptionPlan'),
                     'has_exam_detail' => $hasExamDetail,
                     'token' => $user->createToken('API Token')->plainTextToken,
                 ]);
-            });
+            });            
         });
         // Route::post('questions/import', [CsvImportController::class, 'importQuestions']);
         Route::post('questions/import', [CsvImportController::class, 'importCsv']);
