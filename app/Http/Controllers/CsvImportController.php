@@ -180,61 +180,49 @@ class CsvImportController extends Controller
             'question_file' => ['required', 'file', 'mimes:csv,txt'], // Validate file
             'subject_id' => ['required', 'exists:subjects,id'],       // Validate subject_id exists in the database
         ]);
-
-        $filePath = $request->file('question_file');
+    
+        $filePath = $request->file('question_file')->getRealPath();
         $subjectId = $request->input('subject_id');
-
-        // Open and read the CSV file
-        if (!file_exists($filePath) || !is_readable($filePath)) {
-            return response()->json(['error' => 'CSV file not found or not readable'], 400);
+    
+        // Open CSV File
+        $handle = fopen($filePath, 'r');
+    
+        if (!$handle) {
+            return response()->json(['error' => 'CSV file not readable'], 400);
         }
-
-        $fileHandle = fopen($filePath->getRealPath(), 'r');
-        $header = fgetcsv($fileHandle); // Read header row
-
+    
+        $header = fgetcsv($handle); // Read and discard header row
+        $batchSize = 400;           // Process 400 questions per batch
+        $batch = [];
+    
         DB::beginTransaction();
-
+    
         try {
-            while (($row = fgetcsv($fileHandle)) !== false) {
+            while (($row = fgetcsv($handle)) !== false) {
                 [
                     $serial, $year, $questionText, $image, $optionA, $optionB,
                     $optionC, $optionD, $optionE, $correctOption, $solution, $sectionName,
                     $chapterNumber, $topicName, $objectiveName
                 ] = $row;
-        
+    
                 // Fetch Section
-                $section = Section::where('subject_id', $subjectId)
-                    ->first();
-        
-                if (!$section) {
-                    throw new \Exception("Section not found: {$sectionName}");
-                }
-        
+                $section = Section::where('subject_id', $subjectId)->first();
+                if (!$section) throw new \Exception("Section not found: {$sectionName}");
+    
                 // Fetch Chapter
-                $chapter = Chapter::where('subject_id', $subjectId)
-                    ->first();
-        
-                if (!$chapter) {
-                    throw new \Exception("Chapter not found: {$chapterNumber}");
-                }
-        
+                $chapter = Chapter::where('subject_id', $subjectId)->first();
+                if (!$chapter) throw new \Exception("Chapter not found: {$chapterNumber}");
+    
                 // Fetch Topic
-                $topic = Topic::where('subject_id', $subjectId)
-                    ->first();
-        
-                if (!$topic) {
-                    throw new \Exception("Topic not found: {$topicName}");
-                }
-        
+                $topic = Topic::where('subject_id', $subjectId)->first();
+                if (!$topic) throw new \Exception("Topic not found: {$topicName}");
+    
                 // Fetch Objective
                 $objective = Objective::where('id', $topic->id)->first();
-        
-                if (!$objective) {
-                    throw new \Exception("Objective not found: {$objectiveName}");
-                }
-        
-                // Create Question
-                $question = Question::create([
+                if (!$objective) throw new \Exception("Objective not found: {$objectiveName}");
+    
+                // Prepare question data
+                $questionData = [
                     'year' => $year,
                     'question' => $questionText,
                     'image_url' => $image,
@@ -244,37 +232,33 @@ class CsvImportController extends Controller
                     'topic_id' => $topic->id,
                     'objective_id' => $objective->id,
                     'subject_id' => $subjectId,
-                ]);
-        
-                // Insert Options
-                $options = [
-                    ['value' => $optionA, 'is_correct' => $correctOption === 'A'],
-                    ['value' => $optionB, 'is_correct' => $correctOption === 'B'],
-                    ['value' => $optionC, 'is_correct' => $correctOption === 'C'],
-                    ['value' => $optionD, 'is_correct' => $correctOption === 'D'],
-                    ['value' => $optionE, 'is_correct' => $correctOption === 'E'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ];
-        
-                foreach ($options as $option) {
-                    DB::table('question_options')->insert([
-                        'question_id' => $question->id,
-                        'value' => $option['value'],
-                        'is_correct' => $option['is_correct'],
-                    ]);
+    
+                $batch[] = $questionData;
+    
+                // Process batch when it reaches 400
+                if (count($batch) === $batchSize) {
+                    Question::insert($batch);
+                    $batch = []; // Reset batch
                 }
             }
-        
+    
+            // Insert remaining batch (if any)
+            if (!empty($batch)) {
+                Question::insert($batch);
+            }
+    
             DB::commit();
-            fclose($fileHandle);
-        
+            fclose($handle);
+    
             return response()->json(['message' => 'CSV data imported successfully!']);
         } catch (\Exception $e) {
             DB::rollBack();
-            fclose($fileHandle);
-        
-            return response()->json([
-                'error' => 'Failed to import CSV data: ' . $e->getMessage()
-            ], 500);
+            fclose($handle);
+    
+            return response()->json(['error' => 'Failed to import CSV: ' . $e->getMessage()], 500);
         }
     }
-}
+}    
