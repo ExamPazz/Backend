@@ -11,7 +11,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('mock_exams', function (Blueprint $table) {
-            // $table->json('question_order')->nullable();
+            $table->json('question_order')->nullable();
         });
     }
 
