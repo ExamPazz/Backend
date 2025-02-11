@@ -15,20 +15,26 @@ return [
     |
     */
 
-    'paths' => ['api/*'],
+    // 'paths' => ['api/*'],
 
-    'allowed_methods' => ['*'],
+    // 'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'],
+    // 'allowed_origins' => ['*'],
 
-    'allowed_origins_patterns' => [],
+    // 'allowed_origins_patterns' => [],
 
-    'allowed_headers' => ['*'],
+    // 'allowed_headers' => ['*'],
 
-    'exposed_headers' => [],
+    // 'exposed_headers' => [],
 
-    'max_age' => 0,
+    // 'max_age' => 0,
 
-    'supports_credentials' => true,
+    // 'supports_credentials' => true,
 
+
+        'paths' => ['api/*', 'auth/*'],
+        'allowed_methods' => ['*'],
+        'allowed_origins' => ['https://www.exampazz.com'],
+        'allowed_headers' => ['*'],
+        'supports_credentials' => true,
 ];
