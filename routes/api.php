@@ -71,7 +71,7 @@ Route::group(
             
             Route::get('auth/callback', function () {
                 $googleUser = Socialite::driver('google')->stateless()->user();
-            
+                
                 $user = User::updateOrCreate(
                     ['email' => $googleUser->email],
                     [
@@ -86,22 +86,23 @@ Route::group(
                 $freemiumPlan = SubscriptionPlan::where('name', 'freemium')->first();
             
                 if ($freemiumPlan) {
-                    Subscription::create([
+                    Subscription::firstOrCreate([
                         'user_id' => $user->id,
                         'subscription_plan_id' => $freemiumPlan->id,
+                    ], [
                         'expires_at' => now()->addDays(30),
                     ]);
                 }
             
-                $redirectUrl = session('redirect_url', url('/dashboard')); // Default to dashboard if no previous URL
-            
-                return redirect($redirectUrl)->with([
+                // Force JSON Response instead of Redirect
+                return response()->json([
                     'message' => 'Authenticated successfully',
                     'user' => $user->load('subscription.subscriptionPlan'),
                     'has_exam_detail' => $hasExamDetail,
                     'token' => $user->createToken('API Token')->plainTextToken,
                 ]);
-            });            
+            });
+                       
         });
         // Route::post('questions/import', [CsvImportController::class, 'importQuestions']);
         Route::post('questions/import', [CsvImportController::class, 'importCsv']);
