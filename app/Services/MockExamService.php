@@ -181,126 +181,118 @@ class MockExamService
         DB::beginTransaction();
         try {
             $user = $request->user();
-            $questionIds = collect($request->answers)->pluck('question_id')->unique()->toArray();
-            $selectedOptionIds = collect($request->answers)
-                ->pluck('selected_option')
-                ->filter()
-                ->unique()
-                ->toArray();
-
-            // Fetch all questions and their correct options in one query
-            $questions = Question::with([
-                'questionOptions' => function ($query) use ($selectedOptionIds) {
-                    if (!empty($selectedOptionIds)) {
-                        $query->whereIn('id', $selectedOptionIds);
-                    }
-                    $query->select('id', 'question_id', 'is_correct');
-                }
+            $mockExam = MockExam::with([
+                'mockExamQuestions.question.subject',
+                'mockExamQuestions.question.questionOptions'
             ])
-                ->whereIn('id', $questionIds)
-                ->get()
-                ->keyBy('id');
+                ->where('id', $request->mock_exam_id)
+                ->where('user_id', $user->id)
+                ->firstOrFail();
 
-            $totalQuestions = MockExamQuestion::where('mock_exam_id', $request->mock_exam_id)->count();
-
-            foreach ($request->answers as $answer) {
-                $question = $questions->get($answer['question_id']);
-                if (!$question) {
-                    throw new \Exception("Invalid question ID: {$answer['question_id']}");
-                }
-
-                if (isset($answer['selected_option']) &&
-                    !$question->questionOptions->contains('id', $answer['selected_option'])) {
-                    throw new \Exception("Invalid option selected for question {$answer['question_id']}");
-                }
-            }
+            // Delete existing answers
+            UserExamAnswer::where('mock_exam_id', $request->mock_exam_id)
+                ->where('user_id', $user->id)
+                ->delete();
 
             $answersToInsert = [];
-            $results = [];
             $now = now();
 
+            // Process and store new answers
             foreach ($request->answers as $answer) {
-                $question = $questions->get($answer['question_id']);
-                $selectedOption = null;
+                $question = $mockExam->mockExamQuestions
+                    ->where('question_id', $answer['question_id'])
+                    ->first()
+                    ->question;
 
-                if (isset($answer['selected_option'])) {
-                    $selectedOption = $question->questionOptions->firstWhere('id', $answer['selected_option']);
-                }
+                $selectedOption = $question->questionOptions
+                    ->where('id', $answer['selected_option'])
+                    ->first();
 
-                // Include time spent in the data
                 $answersToInsert[] = [
                     'mock_exam_id' => $request->mock_exam_id,
                     'user_id' => $user->id,
                     'question_id' => $answer['question_id'],
                     'selected_option' => $answer['selected_option'] ?? null,
                     'is_correct' => $selectedOption ? $selectedOption->is_correct : false,
-                    'time_spent' => $answer['time_spent'] ?? 0, // Default to 0 if not provided
+                    'time_spent' => $answer['time_spent'] ?? 0,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ];
-
-                $results[] = [
-                    'question_id' => $answer['question_id'],
-                    'is_correct' => $selectedOption ? $selectedOption->is_correct : false,
-                    'answered' => isset($answer['selected_option']),
-                ];
             }
 
-            UserExamAnswer::query()->where('mock_exam_id', $request->mock_exam_id)
-                ->where('user_id', $user->id)
-                ->delete();
+            // Insert all answers
+            UserExamAnswer::insert($answersToInsert);
 
-            UserExamAnswer::query()->insert($answersToInsert);
+            // Refresh mock exam to get the new answers
+            $mockExam->refresh();
+            $mockExam->load('userAnswers');
 
-            $totalAnswered = count(array_filter($results, fn($result) => $result['answered']));
-            $totalCorrect = count(array_filter($results, fn($result) => $result['is_correct']));
-            $totalWrong = $totalQuestions - $totalAnswered - $totalCorrect;
-            $score = ($totalCorrect / $totalQuestions);
+            // Calculate scores by subject (100 points each)
+            $totalScore = $mockExam->mockExamQuestions
+                ->groupBy('question.subject_id')
+                ->map(function ($questions) use ($mockExam) {
+                    $totalQuestionsInSubject = $questions->count();
+                    $correctAnswersInSubject = $mockExam->userAnswers
+                        ->where('is_correct', true)
+                        ->whereIn('question_id', $questions->pluck('question_id'))
+                        ->count();
 
-            MockExam::query()->where('id', $request->mock_exam_id)
-                ->where('user_id', $user->id)
-                ->whereNull('completed_at')
-                ->update([
-                    'score' => $score,
-                    'completed_at' => $now,
-                    'total_questions' => $totalQuestions,
-                    'total_answered' => $totalAnswered,
-                    'total_correct' => $totalCorrect,
-                    'total_wrong' => $totalWrong,
-                ]);
+                    // Each subject is worth 100 points
+                    $scorePerQuestion = 100 / $totalQuestionsInSubject;
+                    return $correctAnswersInSubject * $scorePerQuestion;
+                })
+                ->sum(); // Sum up all subject scores for total out of 400
+
+            // Calculate other metrics
+            $totalQuestions = $mockExam->mockExamQuestions->count();
+            $totalAnswered = count($request->answers);
+            $totalCorrect = $mockExam->userAnswers->where('is_correct', true)->count();
+            $totalWrong = $totalAnswered - $totalCorrect;
+
+            // Update mock exam with scores
+            $mockExam->update([
+                'score' => round($totalScore),
+                'completed_at' => $now,
+                'total_questions' => $totalQuestions,
+                'total_answered' => $totalAnswered,
+                'total_correct' => $totalCorrect,
+                'total_wrong' => $totalWrong
+            ]);
 
             DB::commit();
+
+            // Handle subscription status
+            $examsLeft = totalMockExamsLeft($user);
+            if ($examsLeft == 0) {
+                $userSubscription = getUserCurrentActiveSubscription($user);
+                $userSubscription->update(['status' => 'inactive']);
+            }
+
+            // Clear cache
             $cacheKey = "mock_exam_{$user->id}";
             if (Cache::has($cacheKey)) {
                 Cache::forget($cacheKey);
             }
 
-            $examsLeft = totalMockExamsLeft($user);
-            if ($examsLeft == 0)
-            {
-                $userSubscription = getUserCurrentActiveSubscription($user);
-                $userSubscription->update([
-                    'status' => 'inactive'
-                ]);
-            }
             return [
-                'results' => $results,
-                'score' => $score,
+                'success' => true,
+                'total_score' => round($totalScore),
                 'total_questions' => $totalQuestions,
                 'total_answered' => $totalAnswered,
                 'total_correct' => $totalCorrect,
-                'total_wrong' => $totalWrong,
+                'total_wrong' => $totalWrong
             ];
+
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Error storing exam answers: ' . $e->getMessage());
 
             return [
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => $e->getMessage()
             ];
         }
     }
-
 
     public function calculateScore($user, $mockExamId)
     {
@@ -451,9 +443,6 @@ class MockExamService
             ], 400);
         }
     }
-
-
-
 
     public function getMockExamDetails($user, $mockExamId)
     {
