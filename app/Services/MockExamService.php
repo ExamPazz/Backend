@@ -248,11 +248,12 @@ class MockExamService
             $totalAnswered = count($request->answers);
             $totalCorrect = $mockExam->userAnswers->where('is_correct', true)->count();
             $totalWrong = $totalAnswered - $totalCorrect;
-
+            $totalTimeSpent = $mockExam->start_time->diffInSeconds(now());
             // Update mock exam with scores
             $mockExam->update([
                 'score' => round($totalScore),
                 'completed_at' => $now,
+                'total_time_spent' => $totalTimeSpent,
                 'total_questions' => $totalQuestions,
                 'total_answered' => $totalAnswered,
                 'total_correct' => $totalCorrect,
