@@ -253,7 +253,6 @@ class MockExamService
             $mockExam->update([
                 'score' => round($totalScore),
                 'completed_at' => $now,
-                'total_time_spent' => $totalTimeSpent,
                 'total_questions' => $totalQuestions,
                 'total_answered' => $totalAnswered,
                 'total_correct' => $totalCorrect,
@@ -281,7 +280,9 @@ class MockExamService
                 'total_questions' => $totalQuestions,
                 'total_answered' => $totalAnswered,
                 'total_correct' => $totalCorrect,
-                'total_wrong' => $totalWrong
+                'total_wrong' => $totalWrong,
+                'total_time_spent' => $totalTimeSpent
+
             ];
 
         } catch (\Exception $e) {
