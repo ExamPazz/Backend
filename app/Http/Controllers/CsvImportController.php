@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Http;
 
 class CsvImportController extends Controller
 {
@@ -189,37 +190,50 @@ class CsvImportController extends Controller
     }
 
     private function storeGoogleDriveImage($url)
-    {
-        try {
-            $fileContents = file_get_contents($url);
-            $fileName = 'images/' . uniqid() . '.png';
+{
+    try {
+        // Convert Google Drive link to direct URL
+        $directUrl = $this->convertGoogleDriveUrl($url);
 
-            Storage::disk('public')->put($fileName, $fileContents);
-
-            return asset('storage/' . $fileName); // Returns a usable URL
-        } catch (\Exception $e) {
-            return null; // Return null if download fails
+        if (!$directUrl) {
+            throw new \Exception('Invalid Google Drive URL');
         }
+
+        // Download file contents with SSL verification disabled
+        $response = Http::withoutVerifying()->get($directUrl);
+
+        // Generate unique file name
+        $fileName = 'images/' . uniqid() . '.png';
+
+        // Store the image in Laravel's public storage
+        Storage::disk('public')->put($fileName, $response->body());
+
+        // Return the accessible URL
+        return asset('storage/' . $fileName);
+    } catch (\Exception $e) {
+        dd("Skipping image due to error: " . $e->getMessage());
+        return null;
     }
+}
+
 
 
     public function importCsv(Request $request)
     {
         $request->validate([
-            'question_file' => ['required', 'file', 'mimes:csv,txt'], // Validate file
-            'subject_id' => ['required', 'exists:subjects,id'],       // Validate subject_id exists in the database
+            'question_file' => ['required', 'file', 'mimes:csv,txt'],
+            'subject_id' => ['required', 'exists:subjects,id'],
         ]);
 
         $filePath = $request->file('question_file');
         $subjectId = $request->input('subject_id');
 
-        // Open and read the CSV file
         if (!file_exists($filePath) || !is_readable($filePath)) {
             return response()->json(['error' => 'CSV file not found or not readable'], 400);
         }
 
         $fileHandle = fopen($filePath->getRealPath(), 'r');
-        $header = fgetcsv($fileHandle); // Read header row
+        $header = fgetcsv($fileHandle);
 
         DB::beginTransaction();
 
@@ -230,44 +244,45 @@ class CsvImportController extends Controller
                     $optionC, $optionD, $optionE, $correctOption, $solution, $sectionName,
                     $chapterNumber, $topicName, $objectiveName
                 ] = $row;
-        
+
                 // Fetch Section
-                $section = Section::where('subject_id', $subjectId)
-                    ->first();
-        
+                $section = Section::where('subject_id', $subjectId)->first();
                 if (!$section) {
                     throw new \Exception("Section not found: {$sectionName}");
                 }
-        
+
                 // Fetch Chapter
-                $chapter = Chapter::where('subject_id', $subjectId)
-                    ->first();
-        
+                $chapter = Chapter::where('subject_id', $subjectId)->first();
                 if (!$chapter) {
                     throw new \Exception("Chapter not found: {$chapterNumber}");
                 }
-        
+
                 // Fetch Topic
-                $topic = Topic::where('subject_id', $subjectId)
-                    ->first();
-        
+                $topic = Topic::where('subject_id', $subjectId)->first();
                 if (!$topic) {
                     throw new \Exception("Topic not found: {$topicName}");
                 }
-        
+
                 // Fetch Objective
                 $objective = Objective::where('id', $topic->id)->first();
-        
                 if (!$objective) {
                     throw new \Exception("Objective not found: {$objectiveName}");
                 }
-        
-                dd($this->storeGoogleDriveImage($this->convertGoogleDriveUrl($image)));
+
+                // Process Image URL for the question
+                $imageUrl = null;
+                if (!empty($image) && str_contains($image, 'drive.google.com')) {
+                    $convertedUrl = $this->convertGoogleDriveUrl($image);
+                    if ($convertedUrl) {
+                        $imageUrl = $this->storeGoogleDriveImage($convertedUrl);
+                    }
+                }
+
                 // Create Question
                 $question = Question::create([
                     'year' => $year,
                     'question' => $questionText,
-                    'image_url' => $this->storeGoogleDriveImage($this->convertGoogleDriveUrl($image)),
+                    'image_url' => $imageUrl, // May be null if invalid
                     'solution' => $solution,
                     'section_id' => $section->id,
                     'chapter_id' => $chapter->id,
@@ -275,33 +290,37 @@ class CsvImportController extends Controller
                     'objective_id' => $objective->id,
                     'subject_id' => $subjectId,
                 ]);
-        
-                // Insert Options
+
+                // Process options (check for image URLs)
                 $options = [
-                    ['value' => $optionA, 'is_correct' => $correctOption === 'A'],
-                    ['value' => $optionB, 'is_correct' => $correctOption === 'B'],
-                    ['value' => $optionC, 'is_correct' => $correctOption === 'C'],
-                    ['value' => $optionD, 'is_correct' => $correctOption === 'D'],
-                    ['value' => $optionE, 'is_correct' => $correctOption === 'E'],
+                    $optionA, $optionB, $optionC, $optionD, $optionE
                 ];
-        
-                foreach ($options as $option) {
+
+                $optionLabels = ['A', 'B', 'C', 'D', 'E'];
+                foreach ($options as $index => $option) {
+                    $optionValue = $option;
+                    if (!empty($option) && str_contains($option, 'drive.google.com')) {
+                        $convertedUrl = $this->convertGoogleDriveUrl($option);
+                        if ($convertedUrl) {
+                            $optionValue = $this->storeGoogleDriveImage($convertedUrl);
+                        }
+                    }
                     DB::table('question_options')->insert([
                         'question_id' => $question->id,
-                        'value' => $option['value'],
-                        'is_correct' => $option['is_correct'],
+                        'value' => $optionValue,
+                        'is_correct' => $correctOption === $optionLabels[$index],
                     ]);
                 }
             }
-        
+
             DB::commit();
             fclose($fileHandle);
-        
+
             return response()->json(['message' => 'CSV data imported successfully!']);
         } catch (\Exception $e) {
             DB::rollBack();
             fclose($fileHandle);
-        
+
             return response()->json([
                 'error' => 'Failed to import CSV data: ' . $e->getMessage()
             ], 500);
