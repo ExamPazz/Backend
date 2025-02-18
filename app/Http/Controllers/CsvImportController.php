@@ -12,6 +12,7 @@ use App\Models\Question;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use Illuminate\Support\Facades\Storage;
 
 class CsvImportController extends Controller
 {
@@ -174,6 +175,34 @@ class CsvImportController extends Controller
 
     }
 
+    private function convertGoogleDriveUrl($url)
+    {
+        if (preg_match('/drive\.google\.com\/file\/d\/([^\/]+)\//', $url, $matches)) {
+            return 'https://drive.google.com/uc?export=download&id=' . $matches[1];
+        }
+
+        if (preg_match('/drive\.google\.com\/open\?id=([^&]+)/', $url, $matches)) {
+            return 'https://drive.google.com/uc?export=download&id=' . $matches[1];
+        }
+
+        return $url;
+    }
+
+    private function storeGoogleDriveImage($url)
+    {
+        try {
+            $fileContents = file_get_contents($url);
+            $fileName = 'images/' . uniqid() . '.png';
+
+            Storage::disk('public')->put($fileName, $fileContents);
+
+            return asset('storage/' . $fileName); // Returns a usable URL
+        } catch (\Exception $e) {
+            return null; // Return null if download fails
+        }
+    }
+
+
     public function importCsv(Request $request)
     {
         $request->validate([
@@ -233,11 +262,12 @@ class CsvImportController extends Controller
                     throw new \Exception("Objective not found: {$objectiveName}");
                 }
         
+                dd($this->storeGoogleDriveImage($this->convertGoogleDriveUrl($image)));
                 // Create Question
                 $question = Question::create([
                     'year' => $year,
                     'question' => $questionText,
-                    'image_url' => $image,
+                    'image_url' => $this->storeGoogleDriveImage($this->convertGoogleDriveUrl($image)),
                     'solution' => $solution,
                     'section_id' => $section->id,
                     'chapter_id' => $chapter->id,
