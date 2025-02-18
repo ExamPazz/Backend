@@ -7,6 +7,7 @@ use App\Models\MockExamQuestion;
 use App\Models\Subject;
 use App\Models\UserExamAnswer;
 use App\Models\Question;
+use App\Models\ExamGeneratingPercentage;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -63,19 +64,68 @@ class MockExamService
 
             foreach ($subjects_ids as $subject_id) {
                 $subject = Subject::findOrFail($subject_id);
-                $selectedQuestionIds = Question::query()
-                    ->where('subject_id', $subject_id)
-                    ->inRandomOrder()
-                    ->limit($subject->number_of_questions) // Use subject-specific question count
-                    ->pluck('id')
-                    ->toArray();
 
-                if (empty($selectedQuestionIds)) {
-                    throw new \RuntimeException("No questions found for subject ID: {$subject_id}");
+                // Get the latest percentage configuration for this subject
+                $percentages = ExamGeneratingPercentage::where('subject_id', $subject_id)
+                    ->orderBy('year', 'desc')
+                    ->get()
+                    ->groupBy(function ($item) {
+                        return $item->section_id ?? $item->section_code;
+                    });
+
+                if ($percentages->isEmpty()) {
+                    // If no percentages set, use the original random selection
+                    $selectedQuestionIds = Question::query()
+                        ->where('subject_id', $subject_id)
+                        ->inRandomOrder()
+                        ->limit($subject->number_of_questions)
+                        ->pluck('id')
+                        ->toArray();
+                } else {
+                    $selectedQuestionIds = [];
+                    $totalQuestionsNeeded = $subject->number_of_questions;
+
+                    // Get questions based on percentage distribution
+                    foreach ($percentages as $sectionIdentifier => $sectionPercentages) {
+                        // Use the most recent year's percentage
+                        $latestPercentage = $sectionPercentages->first();
+                        $questionsNeeded = round(($latestPercentage->percentage_value / 100) * $totalQuestionsNeeded);
+
+                        // Query to get questions for this section
+                        $sectionQuestions = Question::query()
+                            ->where('subject_id', $subject_id)
+                            ->where(function ($query) use ($latestPercentage, $sectionIdentifier) {
+                                if ($latestPercentage->section_id) {
+                                    $query->where('section_id', $latestPercentage->section_id);
+                                } else {
+                                    $query->where('section_code', $latestPercentage->section_code);
+                                }
+                            })
+                            ->inRandomOrder()
+                            ->limit($questionsNeeded)
+                            ->pluck('id')
+                            ->toArray();
+
+                        $selectedQuestionIds = array_merge($selectedQuestionIds, $sectionQuestions);
+                    }
+
+                    // If we don't have enough questions from the percentage distribution,
+                    // fill the remaining slots with random questions
+                    if (count($selectedQuestionIds) < $totalQuestionsNeeded) {
+                        $remainingNeeded = $totalQuestionsNeeded - count($selectedQuestionIds);
+                        $remainingQuestions = Question::query()
+                            ->where('subject_id', $subject_id)
+                            ->whereNotIn('id', $selectedQuestionIds)
+                            ->inRandomOrder()
+                            ->limit($remainingNeeded)
+                            ->pluck('id')
+                            ->toArray();
+
+                        $selectedQuestionIds = array_merge($selectedQuestionIds, $remainingQuestions);
+                    }
                 }
 
-                $questionIds[$subject_id] = $selectedQuestionIds;
-
+                // Create mock exam questions
                 $mockExamQuestions = array_map(function ($questionId) use ($mockExam, $subject_id) {
                     return [
                         'mock_exam_id' => $mockExam->id,
@@ -87,6 +137,7 @@ class MockExamService
                 }, $selectedQuestionIds);
 
                 MockExamQuestion::query()->insert($mockExamQuestions);
+                $questionIds[$subject_id] = $selectedQuestionIds;
             }
 
             foreach ($subjects_ids as $subjectId) {
