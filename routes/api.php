@@ -113,6 +113,8 @@ Route::group(
         Route::post('keys/import/bio', [ImportKeyController::class, 'importStructureForBio']);
         Route::post('keys/import/eng', [ImportKeyController::class, 'importStructureForEng']);
         Route::post('keys/import/lit-eng', [ImportKeyController::class, 'importStructureForLiteng']);
+        Route::post('keys/import/maths', [ImportKeyController::class, 'importStructureForMaths']);
+        Route::post('keys/import/acc', [ImportKeyController::class, 'importStructureForAcc']);
 
 
 

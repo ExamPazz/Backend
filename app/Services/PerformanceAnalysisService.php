@@ -12,49 +12,49 @@ class PerformanceAnalysisService
     public function getUserExamStatistics($user)
     {
         $mockExams = MockExam::where('user_id', $user->id)->get();
-    
+
         if ($mockExams->isEmpty()) {
             return collect();
         }
-    
+
         $totalQuestions = 0;
         $totalAnsweredQuestions = 0;
         $totalCorrectAnswers = 0;
         $totalExamScores = 0;
         $totalTimeSpent = 0; // Total time spent in seconds
         $totalExams = $mockExams->count();
-    
+
         foreach ($mockExams as $mockExam) {
             $userAnswers = UserExamAnswer::where('mock_exam_id', $mockExam->id)
                 ->where('user_id', $user->id)
                 ->get();
-    
+
             $mockExamQuestionsCount = $mockExam->mockExamQuestions->count();
             $correctAnswers = $userAnswers->where('is_correct', true)->count();
-    
+
             // Sum up time spent from the user_answers table
             $examTimeSpent = $userAnswers->sum('time_spent'); // Ensure `time_spent` exists in user_answers
-    
+
             $totalQuestions += $mockExamQuestionsCount;
             $totalAnsweredQuestions += $userAnswers->count();
             $totalCorrectAnswers += $correctAnswers;
             $totalTimeSpent += $examTimeSpent;
-    
+
             if ($mockExamQuestionsCount > 0) {
                 $examScore = ($correctAnswers / $mockExamQuestionsCount) * 100;
                 $totalExamScores += $examScore;
             }
         }
-    
+
         $normalizedTotalCorrectAnswers = min($totalCorrectAnswers, 400);
-    
+
         $averageScore = $normalizedTotalCorrectAnswers;
         $skippedQuestions = $totalQuestions - $totalAnsweredQuestions;
-    
+
         // Calculate average times
         $averageTimePerExam = $totalExams > 0 ? round($totalTimeSpent / $totalExams) : 0;
         $averageTimePerQuestion = $totalAnsweredQuestions > 0 ? round($totalTimeSpent / $totalAnsweredQuestions) : 0;
-    
+
         return [
             'average_score' => $averageScore,
             'total_questions' => $totalQuestions,
@@ -101,36 +101,44 @@ class PerformanceAnalysisService
             ->get();
 
         $result = $mockExams->map(function ($mockExam) {
-            $totalQuestions = $mockExam->mockExamQuestions->count();
-            $userAnswers = $mockExam->userAnswers;
-
-            $totalScore = intval(round($userAnswers->where('is_correct', true)->count() / ($totalQuestions > 0 ? $totalQuestions : 1) * 100));
-
             $totalTimeSpent = $mockExam->end_time->diffInMinutes($mockExam->start_time);
 
-            $subjectScores = $mockExam->mockExamQuestions->groupBy('subject_id')->map(function ($questions, $subjectId) use ($userAnswers) {
-                $totalSubjectQuestions = $questions->count();
-                $correctSubjectAnswers = $questions->filter(function ($question) use ($userAnswers) {
-                    return $userAnswers->where('question_id', $question->question_id)->where('is_correct', true)->isNotEmpty();
-                })->count();
+            // Calculate scores by subject (100 points each)
+            $subjectScores = $mockExam->mockExamQuestions
+                ->groupBy('question.subject_id')
+                ->map(function ($questions) use ($mockExam) {
+                    $totalSubjectQuestions = $questions->count();
+                    $correctSubjectAnswers = $questions->filter(function ($question) use ($mockExam) {
+                        return $mockExam->userAnswers
+                            ->where('question_id', $question->question_id)
+                            ->where('is_correct', true)
+                            ->isNotEmpty();
+                    })->count();
 
-                $attemptedSubjectQuestions = $questions->filter(function ($question) use ($userAnswers) {
-                    return $userAnswers->where('question_id', $question->question_id)->isNotEmpty();
-                })->count();
+                    $attemptedSubjectQuestions = $questions->filter(function ($question) use ($mockExam) {
+                        return $mockExam->userAnswers
+                            ->where('question_id', $question->question_id)
+                            ->isNotEmpty();
+                    })->count();
 
-                $skippedSubjectQuestions = $totalSubjectQuestions - $attemptedSubjectQuestions;
+                    $skippedSubjectQuestions = $totalSubjectQuestions - $attemptedSubjectQuestions;
 
-                $score = $totalSubjectQuestions > 0 ? ($correctSubjectAnswers / $totalSubjectQuestions) * 100 : 0;
+                    // Calculate score out of 100 for this subject
+                    $scorePerQuestion = 100 / $totalSubjectQuestions;
+                    $score = $correctSubjectAnswers * $scorePerQuestion;
 
-                return [
-                    'subject_id' => $subjectId,
-                    'subject_name' => $questions->first()->question->subject->name,
-                    'score' => $score,
-                    'correct_answers' => $correctSubjectAnswers,
-                    'attempted_questions' => $attemptedSubjectQuestions,
-                    'skipped_questions' => $skippedSubjectQuestions,
-                ];
-            })->values();
+                    return [
+                        'subject_id' => $questions->first()->question->subject_id,
+                        'subject_name' => $questions->first()->question->subject->name,
+                        'score' => round($score), // Round to whole number
+                        'correct_answers' => $correctSubjectAnswers,
+                        'attempted_questions' => $attemptedSubjectQuestions,
+                        'skipped_questions' => $skippedSubjectQuestions,
+                    ];
+                })->values();
+
+            // Total score is sum of all subject scores (out of 400)
+            $totalScore = $subjectScores->sum('score');
 
             $topicBreakdown = $this->getMockExamTopicBreakdown($mockExam);
 
@@ -138,7 +146,7 @@ class PerformanceAnalysisService
                 'mock_exam_id' => $mockExam->id,
                 'start_time' => $mockExam->start_time,
                 'end_time' => $mockExam->end_time,
-                'total_score' => $totalScore,
+                'total_score' => round($totalScore), // Round to whole number
                 'total_time_spent' => $totalTimeSpent,
                 'subject_scores' => $subjectScores,
                 'topic_breakdown' => $topicBreakdown,
@@ -321,7 +329,7 @@ class PerformanceAnalysisService
                 }
             }
         }
-    
+
     }
 
     public function getUserWeakAreas($user)
@@ -340,8 +348,8 @@ class PerformanceAnalysisService
                             'topic_name' => $weakArea->topic->body,
                             'total_questions' => $weakArea->total_questions,
                             'correct_answers' => $weakArea->correct_answers,
-                            'accuracy' => $weakArea->total_questions > 0 
-                                ? round(($weakArea->correct_answers / $weakArea->total_questions) * 100, 2) 
+                            'accuracy' => $weakArea->total_questions > 0
+                                ? round(($weakArea->correct_answers / $weakArea->total_questions) * 100, 2)
                                 : 0,
                         ];
                     })->values(),
