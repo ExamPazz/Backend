@@ -16,7 +16,7 @@ class ImportKeyController extends Controller
     public function importStructureForComm(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'csv_file' => 'required|file|mimes:csv,txt',
+            'csv_file' => 'required|file|mimes:csv,txt,xlsx',
             'subject' => 'required|string|max:255', // Validate the subject field
         ]);
         
@@ -65,8 +65,8 @@ class ImportKeyController extends Controller
                             'body' => $sectionBody,
                         ]);
                         
-                        if (isset($topicRaw)) { // Ensure $topicsRaw is defined
-                            $topicLines = explode("\n", $topicRaw); // Split topics into lines
+                        if (isset($topicRaw)) {
+                            $topicLines = preg_split('/[\n;]+/', $topicRaw); // Split on newlines or semicolons
                         
                             foreach ($topicLines as $topicLine) {
                                 $topicLine = trim($topicLine); // Remove extra spaces
@@ -74,21 +74,26 @@ class ImportKeyController extends Controller
                                     continue; // Skip empty lines
                                 }
                         
-                                [$topicCode, $topicBody] = array_pad(explode('.', $topicLine, 2), 2, null);
+                                // Correcting delimiter from '.' to ':'
+                                [$topicCode, $topicBody] = array_pad(preg_split('/\s*[.:]\s*/', $topicLine, 2), 2, null);
                         
+                                // if (!$topicBody) {
+                                //     $topicBody = preg_replace('/^[a-z]\s*/i', '', $topicLine);  // Remove code if delimiter is missing
+                                // }
+                                
                                 $topicCode = trim($topicCode);
                                 $topicBody = trim($topicBody);
                         
                                 $topic = Topic::firstOrCreate([
                                     'subject_id' => $subject->id,
-                                    'section_id' => $section->id, // Link the topic to the current section
-                                    'body' => $topicBody,
+                                    'section_id' => $section->id,
+                                    'code' => $topicCode,  // Stores only 'a'
                                 ], [
-                                    'code' => $topicCode,
+                                    'body' => $topicBody, // Stores only 'Techniques in separation'
                                 ]);
-                        
                             }
                         }
+                        
                     }
                         
         
@@ -101,27 +106,30 @@ class ImportKeyController extends Controller
                     ]);
         
         
-                $lines = explode("\n", $objectiveRaw);
+               
+                    $lines = preg_split('/[;\n]/', $objectiveRaw); // Split by semicolon or newline
 
-                // Loop through each line
-                foreach ($lines as $line) {
-                    $line = trim($line); // Remove unnecessary spaces
-                    if (empty($line)) {
-                        continue;
-                    }
-
-                    if (preg_match('/^(i+)\.\s+(.*)$/i', $line, $matches)) {
-                        $objectiveCode = trim($matches[1]);
-                        $objectiveBody = trim($matches[2]);
-
-                        Objective::firstOrCreate([
-                            'topic_id' => $topic->id, 
-                            'body' => $objectiveBody,
-                        ], [
-                            'code' => $objectiveCode,
-                        ]);
-                    }
-                }
+                    foreach ($lines as $line) {
+                        $line = trim(str_replace("\u{00A0}", '', $line)); // Remove non-breaking spaces
+                        if (empty($line)) continue;
+                    
+                        if (preg_match('/^\s*(iv|v|vii|viii|ix|xi|xii|xiii|xiv|xv|xvi|xvii|xviii|xix|x|xx|xxi|xxii|xxiii|xxiv|vi|iii|ii|i)\.\s*(.+)$/i', $line, $matches)) {
+                            $objectiveCode = trim($matches[1]);
+                            $objectiveBody = trim($matches[2]);
+                    
+                            if (isset($topic)) {
+                                Objective::firstOrCreate([
+                                    'topic_id' => $topic->id, 
+                                    'body' => $objectiveBody,
+                                ], [
+                                    'code' => $objectiveCode,
+                                ]);
+                            } else {
+                                // Log or handle the missing topic scenario
+                                dd("No topic found for objective: {$objectiveBody}");
+                            }
+                        }
+                    }                    
 
             }  
                 DB::commit();
@@ -130,7 +138,8 @@ class ImportKeyController extends Controller
                  DB::rollBack();
                 return response()->json(['error' => $e->getMessage()], 500);
             }
-    } 
+
+    }
 
     public function importStructureforBio(Request $request)
     {
