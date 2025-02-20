@@ -27,6 +27,7 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use Illuminate\Support\Str;
 use App\Http\Controllers\UtmeDateController;
+use App\Http\Controllers\ExamGenerationPercentageController;
 
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
@@ -68,10 +69,10 @@ Route::group(
                 session(['redirect_url' => url()->previous()]); // Store previous URL
                 return Socialite::driver('google')->redirect();
             });
-            
+
             Route::get('auth/callback', function () {
                 $googleUser = Socialite::driver('google')->stateless()->user();
-            
+
                 $user = User::updateOrCreate(
                     ['email' => $googleUser->email],
                     [
@@ -81,10 +82,10 @@ Route::group(
                         'google_token' => $googleUser->token,
                     ]
                 );
-            
+
                 $hasExamDetail = $user->latestExamDetail()->exists();
                 $freemiumPlan = SubscriptionPlan::where('name', 'freemium')->first();
-            
+
                 if ($freemiumPlan) {
                     Subscription::create([
                         'user_id' => $user->id,
@@ -92,16 +93,16 @@ Route::group(
                         'expires_at' => now()->addDays(30),
                     ]);
                 }
-            
+
                 $redirectUrl = session('redirect_url', url('/dashboard')); // Default to dashboard if no previous URL
-            
+
                 return redirect($redirectUrl)->with([
                     'message' => 'Authenticated successfully',
                     'user' => $user->load('subscription.subscriptionPlan'),
                     'has_exam_detail' => $hasExamDetail,
                     'token' => $user->createToken('API Token')->plainTextToken,
                 ]);
-            });            
+            });
         });
         // Route::post('questions/import', [CsvImportController::class, 'importQuestions']);
         Route::post('questions/import', [CsvImportController::class, 'importCsv']);
@@ -157,7 +158,8 @@ Route::group(
                 Route::delete('/{id}', [NotificationController::class, 'destroy']);
             });
             Route::post('/utme-date', [UtmeDateController::class, 'store']);
-            Route::get('/utme-date', [UtmeDateController::class, 'show']); 
+            Route::get('/utme-date', [UtmeDateController::class, 'show']);
+            Route::post('/exam-generation-percentage/import', [ExamGenerationPercentageController::class, 'importFromCsv']);
         });
 
         Route::post('webhook/paystack', [PaystackWebhookController::class, 'handle']);
