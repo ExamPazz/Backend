@@ -159,8 +159,9 @@ Route::group(
             });
             Route::post('/utme-date', [UtmeDateController::class, 'store']);
             Route::get('/utme-date', [UtmeDateController::class, 'show']);
-            Route::post('/exam-generation-percentage/import', [ExamGenerationPercentageController::class, 'importFromCsv']);
         });
+
+        Route::post('/exam-generation-percentage/import', [ExamGenerationPercentageController::class, 'importFromCsv']);
 
         Route::post('webhook/paystack', [PaystackWebhookController::class, 'handle']);
 
