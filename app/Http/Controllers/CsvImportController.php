@@ -314,19 +314,25 @@ class CsvImportController extends Controller
                 // Bulk insert questions and get IDs
                 if (!empty($questionInserts)) {
                     // Insert questions in chunks and get the first ID of each chunk
-                    foreach (array_chunk($questionInserts, 50) as $chunk) {
-                        $firstId = DB::table('questions')->insertGetId($chunk[0]);
+                    foreach (array_chunk($questionInserts, 50) as $questionChunk) {
+                        $firstId = DB::table('questions')->insertGetId($questionChunk[0]);
 
                         // Insert the rest of the chunk
-                        if (count($chunk) > 1) {
-                            DB::table('questions')->insert(array_slice($chunk, 1));
+                        if (count($questionChunk) > 1) {
+                            DB::table('questions')->insert(array_slice($questionChunk, 1));
                         }
 
                         // Calculate IDs for options based on the first ID
                         $currentId = $firstId;
-                        foreach ($chunk as $question) {
+                        foreach ($chunk as $row) { // Use original $chunk instead of $questionChunk
+                            [
+                                $serial, $year, $questionText, $image, $optionA, $optionB,
+                                $optionC, $optionD, $optionE, $correctOption, $solution,
+                                $sectionName, $chapterNumber, $topicName, $objectiveName
+                            ] = $row;
+
                             // Prepare options for this question
-                            $options = [$question['optionA'], $question['optionB'], $question['optionC'], $question['optionD'], $question['optionE']];
+                            $options = [$optionA, $optionB, $optionC, $optionD, $optionE];
                             $optionLabels = ['A', 'B', 'C', 'D', 'E'];
 
                             foreach ($options as $i => $option) {
@@ -349,8 +355,8 @@ class CsvImportController extends Controller
                     }
 
                     // Insert options in chunks
-                    foreach (array_chunk($optionInserts, 50) as $chunk) {
-                        DB::table('question_options')->insert($chunk);
+                    foreach (array_chunk($optionInserts, 50) as $optionChunk) {
+                        DB::table('question_options')->insert($optionChunk);
                     }
                 }
 
