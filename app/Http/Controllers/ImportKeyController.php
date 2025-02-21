@@ -440,8 +440,8 @@ class ImportKeyController extends Controller
                             continue;
                         }
                         
-                        if (isset($topicRaw)) { // Ensure $topicsRaw is defined
-                            $topicLines = explode("\n", $topicRaw); // Split topics into lines
+                        if (isset($topicRaw)) {
+                            $topicLines = preg_split('/[\n;]+/', $topicRaw); // Split on newlines or semicolons
                         
                             foreach ($topicLines as $topicLine) {
                                 $topicLine = trim($topicLine); // Remove extra spaces
@@ -449,19 +449,19 @@ class ImportKeyController extends Controller
                                     continue; // Skip empty lines
                                 }
                         
-                                [$topicCode, $topicBody] = array_pad(explode('.', $topicLine, 2), 2, null);
+                                // Correcting delimiter from '.' to ':'
+                                [$topicCode, $topicBody] = array_pad(preg_split('/[.:]/', $topicLine, 2), 2, null);
                         
                                 $topicCode = trim($topicCode);
                                 $topicBody = trim($topicBody);
                         
                                 $topic = Topic::firstOrCreate([
                                     'subject_id' => $subject->id,
-                                    'section_id' => $section->id, // Link the topic to the current section
-                                    'body' => $topicBody,
+                                    'section_id' => $section->id,
+                                    'code' => $topicCode,  // Stores only 'a'
                                 ], [
-                                    'code' => $topicCode,
+                                    'body' => $topicBody, // Stores only 'Techniques in separation'
                                 ]);
-                        
                             }
                         }
                     }

@@ -249,28 +249,30 @@ public function importCsv(Request $request)
                 // dd($sectionName);
             // Validate relationships using pre-fetched data
            // Fetch Section
-$section = Section::where('subject_id', $subjectId)->first();
-if (!$section) {
-    throw new \Exception("Section not found: {$sectionName}");
-}
+    // Section
+$section = Section::firstOrCreate(
+    ['subject_id' => $subjectId],
+    ['subject_id' => $subjectId, 'created_at' => now(), 'updated_at' => now()]
+);
 
-// Fetch Chapter
-$chapter = Chapter::where('subject_id', $subjectId)->where('code', $chapterNumber)->first();
-if (!$chapter) {
-    throw new \Exception("Chapter not found: {$chapterNumber}");
-}
+// Chapter
+$chapter = Chapter::firstOrCreate(
+    ['subject_id' => $subjectId, 'code' => $chapterNumber],
+    ['subject_id' => $subjectId, 'code' => $chapterNumber, 'created_at' => now(), 'updated_at' => now()]
+);
 
-// Fetch Topic
-$topic = Topic::where('code', $topicName)->first();
-if (!$topic) {
-    throw new \Exception("Topic not found: {$topicName}");
-}
+// Topic
+$topic = Topic::firstOrCreate(
+    ['code' => $topicName],
+    ['code' => $topicName, 'created_at' => now(), 'updated_at' => now()]
+);
 
-// Fetch Objective
-$objective = Objective::where('code', $objectiveName)->first();
-if (!$objective) {
-    throw new \Exception("Objective not found: {$objectiveName}");
-}
+// Objective
+$objective = Objective::firstOrCreate(
+    ['code' => $objectiveName],
+    ['code' => $objectiveName, 'created_at' => now(), 'updated_at' => now()]
+);
+
 
 
             if (!$section || !$chapter || !$topic || !$objective) {
