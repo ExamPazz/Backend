@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Http;
 
 class CsvImportController extends Controller
 {
+    
 
     public function importQuestions(Request $request)
     {
@@ -218,6 +219,8 @@ class CsvImportController extends Controller
 
 public function importCsv(Request $request)
 {
+    ini_set('max_execution_time', 500);
+
     $request->validate([
         'question_file' => ['required', 'file', 'mimes:csv,txt,xlsx'],
         'subject_id' => ['required', 'exists:subjects,id'],
