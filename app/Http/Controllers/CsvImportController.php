@@ -233,20 +233,18 @@ class CsvImportController extends Controller
             return response()->json(['error' => 'CSV file not found or not readable'], 400);
         }
 
-        // Pre-fetch and cache relationships to avoid repeated queries
+        // Pre-fetch and cache relationships
         $sections = Section::where('subject_id', $subjectId)->pluck('id', 'code');
         $chapters = Chapter::where('subject_id', $subjectId)->pluck('id', 'code');
         $topics = Topic::pluck('id', 'code');
         $objectives = Objective::pluck('id', 'code');
 
-        $batchSize = 100; // Reduced batch size for better memory management
+        $batchSize = 100;
         $processedRows = 0;
-        $totalRows = 0;
 
         DB::beginTransaction();
 
         try {
-            // Use LazyCollection to efficiently read large files
             $rows = LazyCollection::make(function () use ($filePath) {
                 $handle = fopen($filePath->getRealPath(), 'r');
                 fgetcsv($handle); // Skip header
@@ -258,7 +256,7 @@ class CsvImportController extends Controller
                 fclose($handle);
             });
 
-            // Process in chunks to manage memory
+            // Process in chunks
             $rows->chunk($batchSize)->each(function ($chunk) use (
                 $subjectId,
                 $sections,
@@ -269,6 +267,7 @@ class CsvImportController extends Controller
             ) {
                 $questionInserts = [];
                 $optionInserts = [];
+                $lastInsertId = null;
 
                 foreach ($chunk as $row) {
                     [
@@ -282,7 +281,7 @@ class CsvImportController extends Controller
                         !isset($chapters[$chapterNumber]) ||
                         !isset($topics[$topicName]) ||
                         !isset($objectives[$objectiveName])) {
-                        \Log::warning("Skipping row due to missing relationship", compact(
+                        \Illuminate\Support\Facades\Log::warning("Skipping row due to missing relationship", compact(
                             'sectionName',
                             'chapterNumber',
                             'topicName',
@@ -291,16 +290,14 @@ class CsvImportController extends Controller
                         continue;
                     }
 
-                    // Process image asynchronously if needed
+                    // Process image if needed
                     $imageUrl = null;
                     if (!empty($image) && str_contains($image, 'drive.google.com')) {
                         $imageUrl = $this->storeGoogleDriveImage($this->convertGoogleDriveUrl($image));
                     }
 
-                    $questionId = (string) Str::uuid();
-
+                    // Remove UUID generation and just prepare the insert data
                     $questionInserts[] = [
-                        'id' => $questionId,
                         'year' => $year,
                         'question' => $questionText,
                         'image_url' => $imageUrl,
@@ -313,32 +310,55 @@ class CsvImportController extends Controller
                         'created_at' => now(),
                         'updated_at' => now(),
                     ];
-
-                    // Prepare options
-                    $options = [$optionA, $optionB, $optionC, $optionD, $optionE];
-                    $optionLabels = ['A', 'B', 'C', 'D', 'E'];
-
-                    foreach ($options as $i => $option) {
-                        if (empty($option)) continue;
-
-                        $optionValue = str_contains($option, 'drive.google.com')
-                            ? $this->storeGoogleDriveImage($this->convertGoogleDriveUrl($option))
-                            : $option;
-
-                        $optionInserts[] = [
-                            'question_id' => $questionId,
-                            'value' => $optionValue,
-                            'is_correct' => $correctOption === $optionLabels[$i],
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ];
-                    }
                 }
 
-                // Bulk insert questions and options
+                // Bulk insert questions and get IDs
                 if (!empty($questionInserts)) {
-                    DB::table('questions')->insert($questionInserts);
-                    DB::table('question_options')->insert($optionInserts);
+                    // Insert questions in chunks and get the first ID of each chunk
+                    foreach (array_chunk($questionInserts, 50) as $questionChunk) {
+                        $firstId = DB::table('questions')->insertGetId($questionChunk[0]);
+
+                        // Insert the rest of the chunk
+                        if (count($questionChunk) > 1) {
+                            DB::table('questions')->insert(array_slice($questionChunk, 1));
+                        }
+
+                        // Calculate IDs for options based on the first ID
+                        $currentId = $firstId;
+                        foreach ($chunk as $row) { // Use original $chunk instead of $questionChunk
+                            [
+                                $serial, $year, $questionText, $image, $optionA, $optionB,
+                                $optionC, $optionD, $optionE, $correctOption, $solution,
+                                $sectionName, $chapterNumber, $topicName, $objectiveName
+                            ] = $row;
+
+                            // Prepare options for this question
+                            $options = [$optionA, $optionB, $optionC, $optionD, $optionE];
+                            $optionLabels = ['A', 'B', 'C', 'D', 'E'];
+
+                            foreach ($options as $i => $option) {
+                                if (empty($option)) continue;
+
+                                $optionValue = str_contains($option, 'drive.google.com')
+                                    ? $this->storeGoogleDriveImage($this->convertGoogleDriveUrl($option))
+                                    : $option;
+
+                                $optionInserts[] = [
+                                    'question_id' => $currentId,
+                                    'value' => $optionValue,
+                                    'is_correct' => $correctOption === $optionLabels[$i],
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ];
+                            }
+                            $currentId++;
+                        }
+                    }
+
+                    // Insert options in chunks
+                    foreach (array_chunk($optionInserts, 50) as $optionChunk) {
+                        DB::table('question_options')->insert($optionChunk);
+                    }
                 }
 
                 $processedRows += count($chunk);
