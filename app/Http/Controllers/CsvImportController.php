@@ -219,7 +219,7 @@ class CsvImportController extends Controller
 
 public function importCsv(Request $request)
 {
-    ini_set('max_execution_time', 500);
+    ini_set('max_execution_time', 300);
 
     $request->validate([
         'question_file' => ['required', 'file', 'mimes:csv,txt,xlsx'],
