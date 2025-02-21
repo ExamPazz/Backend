@@ -269,9 +269,15 @@ $topic = Topic::firstOrCreate(
 
 // Objective
 $objective = Objective::firstOrCreate(
-    ['code' => $objectiveName],
-    ['code' => $objectiveName, 'created_at' => now(), 'updated_at' => now()]
+    ['code' => $objectiveName, 'topic_id' => $topic->id],  // Search criteria
+    [
+        'code' => $objectiveName,
+        'topic_id' => $topic->id,                          // Provide the required foreign key
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]
 );
+
 
 
 
