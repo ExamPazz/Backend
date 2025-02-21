@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ExamGeneratingPercentage;
+use App\Models\Section;
 use App\Models\Subject;
 use App\Support\ApiResponse;
 use Illuminate\Http\Request;
@@ -40,6 +41,7 @@ class ExamGenerationPercentageController extends Controller
                 $sectionCode = $row[0]; // Section number (I, II, III, etc.)
                 $label = $row[1]; // Section label
 
+                $sectionModel = Section::query()->where('subject_id', $subject_id)->firstWhere('code', $sectionCode);
                 // Process each year's percentage
                 foreach ($yearColumns as $index => $year) {
                     $percentage = (float) ($row[$index + 2] ?? 0);
@@ -48,6 +50,7 @@ class ExamGenerationPercentageController extends Controller
                     if ($percentage > 0) {
                         ExamGeneratingPercentage::create([
                             'subject_id' => $subject_id,
+                            'section_id' => $sectionModel->id,
                             'section_code' => $sectionCode,
                             'year' => $year,
                             'percentage_value' => $percentage

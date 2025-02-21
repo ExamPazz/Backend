@@ -95,10 +95,8 @@ class MockExamService
                         $sectionQuestions = Question::query()
                             ->where('subject_id', $subject_id)
                             ->where(function ($query) use ($latestPercentage, $sectionIdentifier) {
-                                if ($latestPercentage->section_id) {
-                                    $query->where('section_id', $latestPercentage->section_id);
-                                } else {
-                                    $query->where('section_code', $latestPercentage->section_code);
+                                if ($latestPercentage->section) {
+                                    $query->where('section_id', $latestPercentage->section->id);
                                 }
                             })
                             ->inRandomOrder()
