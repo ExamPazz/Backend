@@ -377,7 +377,8 @@ class CsvImportController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            DB::rollBack();
+            $e->getMessage();
+            // DB::rollBack();
 
             return response()->json([
                 'error' => 'Failed to import CSV data: ' . $e->getMessage()
