@@ -281,19 +281,13 @@ class CsvImportController extends Controller
                         // \Illuminate\Support\Facades\Log::warning("Skipping row due to invalid or empty year", compact('row'));
                         continue; // Skip rows with invalid or empty year
                     }
-                    // Validate relationships using cached data
-                    // if (!isset($sections[$sectionName]) ||
-                    //     !isset($chapters[$chapterNumber]) ||
-                    //     !isset($topics[$topicName]) ||
-                    //     !isset($objectives[$objectiveName])) {
-                    //     // \Illuminate\Support\Facades\Log::warning("Skipping row due to missing relationship", compact(
-                    //     //     'sectionName',
-                    //     //     'chapterNumber',
-                    //     //     'topicName',
-                    //     //     'objectiveName'
-                    //     ));
-                    //     continue;
-                    // }
+                    if (!isset($sections[$sectionName]) ||
+                        !isset($chapters[$chapterNumber]) ||
+                        !isset($topics[$topicName]) ||
+                        !isset($objectives[$objectiveName])) {
+
+                        continue;
+                    }
 
                     // Process image if needed
                     $imageUrl = null;
