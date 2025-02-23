@@ -275,6 +275,12 @@ class CsvImportController extends Controller
                         $sectionName, $chapterNumber, $topicName, $objectiveName
                     ] = $row;
 
+                    $year = is_numeric($year) && strlen($year) === 4 ? (int)$year : null;
+
+                    if (is_null($year)) {
+                        \Illuminate\Support\Facades\Log::warning("Skipping row due to invalid or empty year", compact('row'));
+                        continue; // Skip rows with invalid or empty year
+                    }
                     // Validate relationships using cached data
                     if (!isset($sections[$sectionName]) ||
                         !isset($chapters[$chapterNumber]) ||
