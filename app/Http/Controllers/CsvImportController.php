@@ -12,6 +12,10 @@ use App\Models\Question;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\LazyCollection;
+use Illuminate\Support\Str;
 
 class CsvImportController extends Controller
 {
@@ -174,104 +178,201 @@ class CsvImportController extends Controller
 
     }
 
+    private function convertGoogleDriveUrl($url)
+    {
+        if (preg_match('/drive\.google\.com\/file\/d\/([^\/]+)\//', $url, $matches)) {
+            return 'https://drive.google.com/uc?export=download&id=' . $matches[1];
+        }
+
+        if (preg_match('/drive\.google\.com\/open\?id=([^&]+)/', $url, $matches)) {
+            return 'https://drive.google.com/uc?export=download&id=' . $matches[1];
+        }
+
+        return $url;
+    }
+
+    private function storeGoogleDriveImage($url)
+    {
+        try {
+            // Convert Google Drive link to direct URL
+            $directUrl = $this->convertGoogleDriveUrl($url);
+
+            if (!$directUrl) {
+                throw new \Exception('Invalid Google Drive URL');
+            }
+
+            // Download file contents with SSL verification disabled
+            $response = Http::withoutVerifying()->get($directUrl);
+
+            // Generate unique file name
+            $fileName = 'images/' . uniqid() . '.png';
+
+            // Store the image in Laravel's public storage
+            Storage::disk('public')->put($fileName, $response->body());
+
+            // Return the accessible URL
+            return asset('storage/' . $fileName);
+        } catch (\Exception $e) {
+            dd("Skipping image due to error: " . $e->getMessage());
+            return null;
+        }
+    }
+
     public function importCsv(Request $request)
     {
         $request->validate([
-            'question_file' => ['required', 'file', 'mimes:csv,txt'], // Validate file
-            'subject_id' => ['required', 'exists:subjects,id'],       // Validate subject_id exists in the database
+            'question_file' => ['required', 'file', 'mimes:csv,txt,xlsx'],
+            'subject_id' => ['required', 'exists:subjects,id'],
         ]);
 
         $filePath = $request->file('question_file');
         $subjectId = $request->input('subject_id');
 
-        // Open and read the CSV file
         if (!file_exists($filePath) || !is_readable($filePath)) {
             return response()->json(['error' => 'CSV file not found or not readable'], 400);
         }
 
-        $fileHandle = fopen($filePath->getRealPath(), 'r');
-        $header = fgetcsv($fileHandle); // Read header row
+        // Pre-fetch and cache relationships
+        $sections = Section::where('subject_id', $subjectId)->pluck('id', 'code');
+        $chapters = Chapter::where('subject_id', $subjectId)->pluck('id', 'code');
+        $topics = Topic::pluck('id', 'code');
+        $objectives = Objective::pluck('id', 'code');
+
+        $batchSize = 100;
+        $processedRows = 0;
 
         DB::beginTransaction();
 
         try {
-            while (($row = fgetcsv($fileHandle)) !== false) {
-                [
-                    $serial, $year, $questionText, $image, $optionA, $optionB,
-                    $optionC, $optionD, $optionE, $correctOption, $solution, $sectionName,
-                    $chapterNumber, $topicName, $objectiveName
-                ] = $row;
-        
-                // Fetch Section
-                $section = Section::where('subject_id', $subjectId)
-                    ->first();
-        
-                if (!$section) {
-                    throw new \Exception("Section not found: {$sectionName}");
+            $rows = LazyCollection::make(function () use ($filePath) {
+                $handle = fopen($filePath->getRealPath(), 'r');
+                fgetcsv($handle); // Skip header
+
+                while ($row = fgetcsv($handle)) {
+                    yield $row;
                 }
-        
-                // Fetch Chapter
-                $chapter = Chapter::where('subject_id', $subjectId)
-                    ->first();
-        
-                if (!$chapter) {
-                    throw new \Exception("Chapter not found: {$chapterNumber}");
+
+                fclose($handle);
+            });
+
+            // Process in chunks
+            $rows->chunk($batchSize)->each(function ($chunk) use (
+                $subjectId,
+                $sections,
+                $chapters,
+                $topics,
+                $objectives,
+                &$processedRows
+            ) {
+                $questionInserts = [];
+                $optionInserts = [];
+                $lastInsertId = null;
+
+                foreach ($chunk as $row) {
+                    [
+                        $serial, $year, $questionText, $image, $optionA, $optionB,
+                        $optionC, $optionD, $optionE, $correctOption, $solution,
+                        $sectionName, $chapterNumber, $topicName, $objectiveName
+                    ] = $row;
+
+                    // Validate relationships using cached data
+                    if (!isset($sections[$sectionName]) ||
+                        !isset($chapters[$chapterNumber]) ||
+                        !isset($topics[$topicName]) ||
+                        !isset($objectives[$objectiveName])) {
+                        \Illuminate\Support\Facades\Log::warning("Skipping row due to missing relationship", compact(
+                            'sectionName',
+                            'chapterNumber',
+                            'topicName',
+                            'objectiveName'
+                        ));
+                        continue;
+                    }
+
+                    // Process image if needed
+                    $imageUrl = null;
+                    if (!empty($image) && str_contains($image, 'drive.google.com')) {
+                        $imageUrl = $this->storeGoogleDriveImage($this->convertGoogleDriveUrl($image));
+                    }
+
+                    // Remove UUID generation and just prepare the insert data
+                    $questionInserts[] = [
+                        'year' => $year,
+                        'question' => $questionText,
+                        'image_url' => $imageUrl,
+                        'solution' => $solution,
+                        'section_id' => $sections[$sectionName],
+                        'chapter_id' => $chapters[$chapterNumber],
+                        'topic_id' => $topics[$topicName],
+                        'objective_id' => $objectives[$objectiveName],
+                        'subject_id' => $subjectId,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
                 }
-        
-                // Fetch Topic
-                $topic = Topic::where('subject_id', $subjectId)
-                    ->first();
-        
-                if (!$topic) {
-                    throw new \Exception("Topic not found: {$topicName}");
+
+                // Bulk insert questions and get IDs
+                if (!empty($questionInserts)) {
+                    // Insert questions in chunks and get the first ID of each chunk
+                    foreach (array_chunk($questionInserts, 50) as $questionChunk) {
+                        $firstId = DB::table('questions')->insertGetId($questionChunk[0]);
+
+                        // Insert the rest of the chunk
+                        if (count($questionChunk) > 1) {
+                            DB::table('questions')->insert(array_slice($questionChunk, 1));
+                        }
+
+                        // Calculate IDs for options based on the first ID
+                        $currentId = $firstId;
+                        foreach ($chunk as $row) { // Use original $chunk instead of $questionChunk
+                            [
+                                $serial, $year, $questionText, $image, $optionA, $optionB,
+                                $optionC, $optionD, $optionE, $correctOption, $solution,
+                                $sectionName, $chapterNumber, $topicName, $objectiveName
+                            ] = $row;
+
+                            // Prepare options for this question
+                            $options = [$optionA, $optionB, $optionC, $optionD, $optionE];
+                            $optionLabels = ['A', 'B', 'C', 'D', 'E'];
+
+                            foreach ($options as $i => $option) {
+                                if (empty($option)) continue;
+
+                                $optionValue = str_contains($option, 'drive.google.com')
+                                    ? $this->storeGoogleDriveImage($this->convertGoogleDriveUrl($option))
+                                    : $option;
+
+                                $optionInserts[] = [
+                                    'question_id' => $currentId,
+                                    'value' => $optionValue,
+                                    'is_correct' => $correctOption === $optionLabels[$i],
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ];
+                            }
+                            $currentId++;
+                        }
+                    }
+
+                    // Insert options in chunks
+                    foreach (array_chunk($optionInserts, 50) as $optionChunk) {
+                        DB::table('question_options')->insert($optionChunk);
+                    }
                 }
-        
-                // Fetch Objective
-                $objective = Objective::where('id', $topic->id)->first();
-        
-                if (!$objective) {
-                    throw new \Exception("Objective not found: {$objectiveName}");
-                }
-        
-                // Create Question
-                $question = Question::create([
-                    'year' => $year,
-                    'question' => $questionText,
-                    'image_url' => $image,
-                    'solution' => $solution,
-                    'section_id' => $section->id,
-                    'chapter_id' => $chapter->id,
-                    'topic_id' => $topic->id,
-                    'objective_id' => $objective->id,
-                    'subject_id' => $subjectId,
-                ]);
-        
-                // Insert Options
-                $options = [
-                    ['value' => $optionA, 'is_correct' => $correctOption === 'A'],
-                    ['value' => $optionB, 'is_correct' => $correctOption === 'B'],
-                    ['value' => $optionC, 'is_correct' => $correctOption === 'C'],
-                    ['value' => $optionD, 'is_correct' => $correctOption === 'D'],
-                    ['value' => $optionE, 'is_correct' => $correctOption === 'E'],
-                ];
-        
-                foreach ($options as $option) {
-                    DB::table('question_options')->insert([
-                        'question_id' => $question->id,
-                        'value' => $option['value'],
-                        'is_correct' => $option['is_correct'],
-                    ]);
-                }
-            }
-        
+
+                $processedRows += count($chunk);
+            });
+
             DB::commit();
-            fclose($fileHandle);
-        
-            return response()->json(['message' => 'CSV data imported successfully!']);
+
+            return response()->json([
+                'message' => 'CSV data imported successfully!',
+                'processed_rows' => $processedRows
+            ]);
+
         } catch (\Exception $e) {
             DB::rollBack();
-            fclose($fileHandle);
-        
+
             return response()->json([
                 'error' => 'Failed to import CSV data: ' . $e->getMessage()
             ], 500);
