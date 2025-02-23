@@ -264,10 +264,10 @@ class CsvImportController extends Controller
                 $objectives,
                 &$processedRows
             ) {
-                $questionInserts = [];
-                $optionInserts = [];
-                $lastInsertId = null;
+                $questionData = [];
+                $optionsData = [];
 
+                // First pass: Prepare question and option data
                 foreach ($chunk as $row) {
                     [
                         $serial, $year, $questionText, $image, $optionA, $optionB,
@@ -295,72 +295,71 @@ class CsvImportController extends Controller
                         $imageUrl = $this->storeGoogleDriveImage($this->convertGoogleDriveUrl($image));
                     }
 
-                    // Remove UUID generation and just prepare the insert data
-                    $questionInserts[] = [
-                        'year' => $year,
-                        'question' => $questionText,
-                        'image_url' => $imageUrl,
-                        'solution' => $solution,
-                        'section_id' => $sections[$sectionName],
-                        'chapter_id' => $chapters[$chapterNumber],
-                        'topic_id' => $topics[$topicName],
-                        'objective_id' => $objectives[$objectiveName],
-                        'subject_id' => $subjectId,
-                        'created_at' => now(),
-                        'updated_at' => now(),
+                    // Store question data with its options for later processing
+                    $questionData[] = [
+                        'question' => [
+                            'year' => $year,
+                            'question' => $questionText,
+                            'image_url' => $imageUrl,
+                            'solution' => $solution,
+                            'section_id' => $sections[$sectionName],
+                            'chapter_id' => $chapters[$chapterNumber],
+                            'topic_id' => $topics[$topicName],
+                            'objective_id' => $objectives[$objectiveName],
+                            'subject_id' => $subjectId,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ],
+                        'options' => [
+                            'values' => [$optionA, $optionB, $optionC, $optionD, $optionE],
+                            'correct' => $correctOption
+                        ]
                     ];
                 }
 
-                // Bulk insert questions and get IDs
-                if (!empty($questionInserts)) {
-                    // Insert questions in chunks and get the first ID of each chunk
-                    foreach (array_chunk($questionInserts, 50) as $questionChunk) {
-                        $firstId = DB::table('questions')->insertGetId($questionChunk[0]);
+                // Second pass: Insert questions and their options maintaining relationship
+                foreach (array_chunk($questionData, 50) as $chunk) {
+                    // Insert questions
+                    $questions = array_column($chunk, 'question');
+                    $firstId = DB::table('questions')->insertGetId($questions[0]);
 
-                        // Insert the rest of the chunk
-                        if (count($questionChunk) > 1) {
-                            DB::table('questions')->insert(array_slice($questionChunk, 1));
-                        }
-
-                        // Calculate IDs for options based on the first ID
-                        $currentId = $firstId;
-                        foreach ($chunk as $row) { // Use original $chunk instead of $questionChunk
-                            [
-                                $serial, $year, $questionText, $image, $optionA, $optionB,
-                                $optionC, $optionD, $optionE, $correctOption, $solution,
-                                $sectionName, $chapterNumber, $topicName, $objectiveName
-                            ] = $row;
-
-                            // Prepare options for this question
-                            $options = [$optionA, $optionB, $optionC, $optionD, $optionE];
-                            $optionLabels = ['A', 'B', 'C', 'D', 'E'];
-
-                            foreach ($options as $i => $option) {
-                                if (empty($option)) continue;
-
-                                $optionValue = str_contains($option, 'drive.google.com')
-                                    ? $this->storeGoogleDriveImage($this->convertGoogleDriveUrl($option))
-                                    : $option;
-
-                                $optionInserts[] = [
-                                    'question_id' => $currentId,
-                                    'value' => $optionValue,
-                                    'is_correct' => $correctOption === $optionLabels[$i],
-                                    'created_at' => now(),
-                                    'updated_at' => now(),
-                                ];
-                            }
-                            $currentId++;
-                        }
+                    if (count($questions) > 1) {
+                        DB::table('questions')->insert(array_slice($questions, 1));
                     }
 
-                    // Insert options in chunks
-                    foreach (array_chunk($optionInserts, 50) as $optionChunk) {
-                        DB::table('question_options')->insert($optionChunk);
+                    // Process options for these questions
+                    $currentId = $firstId;
+                    foreach ($chunk as $data) {
+                        $optionLabels = ['A', 'B', 'C', 'D', 'E'];
+
+                        foreach ($data['options']['values'] as $i => $option) {
+                            if (empty($option)) continue;
+
+                            $optionValue = str_contains($option, 'drive.google.com')
+                                ? $this->storeGoogleDriveImage($this->convertGoogleDriveUrl($option))
+                                : $option;
+
+                            $optionsData[] = [
+                                'question_id' => $currentId,
+                                'value' => $optionValue,
+                                'is_correct' => $data['options']['correct'] === $optionLabels[$i],
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ];
+                        }
+                        $currentId++;
+                    }
+
+                    // Insert options for this chunk immediately
+                    if (!empty($optionsData)) {
+                        foreach (array_chunk($optionsData, 50) as $optionsChunk) {
+                            DB::table('question_options')->insert($optionsChunk);
+                        }
+                        $optionsData = []; // Clear options array after insertion
                     }
                 }
 
-                $processedRows += count($chunk);
+                $processedRows += count($questionData);
             });
 
             DB::commit();
