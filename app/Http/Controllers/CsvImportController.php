@@ -262,7 +262,7 @@ class CsvImportController extends Controller
                 $chapters,
                 $topics,
                 $objectives,
-                &$processedRows
+                $processedRows
             ) {
                 $questionInserts = [];
                 $optionInserts = [];
