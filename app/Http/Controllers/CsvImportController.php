@@ -334,52 +334,67 @@ class CsvImportController extends Controller
 
         try {
             $convertedCount = 0;
+            $failedConversions = [];
 
-            // 📝 Fetch questions with images in `image_url` or `solution`
-            $questionsWithImages = Question::where('subject_id', $subjectId)
+            // 🔄 Process questions in chunks (image_url & solution)
+            Question::where('subject_id', $subjectId)
                 ->where(function ($query) {
                     $query->where('image_url', 'like', '%drive.google.com%')
                         ->orWhere('solution', 'like', '%drive.google.com%');
                 })
-                ->get();
+                ->chunk(100, function ($questions) use (&$convertedCount, &$failedConversions) {
+                    foreach ($questions as $question) {
+                        $updatedFields = [];
 
-            // 📝 Fetch options with images
-            $optionsWithImages = QuestionOption::whereHas('question', function ($query) use ($subjectId) {
+                        // 🖼️ Convert image_url if still Google Drive URL
+                        if ($question->image_url && str_contains($question->image_url, 'drive.google.com')) {
+                            $convertedUrl = $this->convertAndStoreImage($question->image_url);
+                            if ($convertedUrl) {
+                                $updatedFields['image_url'] = $convertedUrl;
+                                $convertedCount++;
+                            } else {
+                                $failedConversions[] = ['type' => 'question_image', 'id' => $question->id];
+                            }
+                        }
+
+                        // 📝 Convert solution if still Google Drive URL
+                        if ($question->solution && str_contains($question->solution, 'drive.google.com')) {
+                            $convertedSolutionUrl = $this->convertAndStoreImage($question->solution);
+                            if ($convertedSolutionUrl) {
+                                $updatedFields['solution'] = $convertedSolutionUrl;
+                                $convertedCount++;
+                            } else {
+                                $failedConversions[] = ['type' => 'question_solution', 'id' => $question->id];
+                            }
+                        }
+
+                        if (!empty($updatedFields)) {
+                            $question->update($updatedFields);
+                        }
+                    }
+                });
+
+            // 🔄 Process options in chunks
+            QuestionOption::whereHas('question', function ($query) use ($subjectId) {
                     $query->where('subject_id', $subjectId);
                 })
                 ->where('value', 'like', '%drive.google.com%')
-                ->get();
-
-            // 🔄 Convert images in `questions` (image_url & solution)
-            foreach ($questionsWithImages as $question) {
-                $updatedFields = [];
-
-                if ($question->image_url && $convertedUrl = $this->convertAndStoreImage($question->image_url)) {
-                    $updatedFields['image_url'] = $convertedUrl;
-                    $convertedCount++;
-                }
-
-                if ($question->solution && $convertedSolutionUrl = $this->convertAndStoreImage($question->solution)) {
-                    $updatedFields['solution'] = $convertedSolutionUrl;
-                    $convertedCount++;
-                }
-
-                if (!empty($updatedFields)) {
-                    $question->update($updatedFields);
-                }
-            }
-
-            // 🔄 Convert images in `question_options`
-            foreach ($optionsWithImages as $option) {
-                if ($convertedUrl = $this->convertAndStoreImage($option->value)) {
-                    $option->update(['value' => $convertedUrl]);
-                    $convertedCount++;
-                }
-            }
+                ->chunk(100, function ($options) use (&$convertedCount, &$failedConversions) {
+                    foreach ($options as $option) {
+                        $convertedUrl = $this->convertAndStoreImage($option->value);
+                        if ($convertedUrl) {
+                            $option->update(['value' => $convertedUrl]);
+                            $convertedCount++;
+                        } else {
+                            $failedConversions[] = ['type' => 'option', 'id' => $option->id];
+                        }
+                    }
+                });
 
             return response()->json([
                 'message' => 'Image conversion completed.',
                 'converted_images' => $convertedCount,
+                'failed_conversions' => $failedConversions,
             ]);
 
         } catch (\Exception $e) {
