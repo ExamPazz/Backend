@@ -234,10 +234,10 @@ class CsvImportController extends Controller
         }
 
         // Pre-fetch and cache relationships
-        $sections = Section::where('subject_id', $subjectId)->pluck('id', 'code');
-        $chapters = Chapter::where('subject_id', $subjectId)->pluck('id', 'code');
-        $topics = Topic::pluck('id', 'code');
-        $objectives = Objective::pluck('id', 'code');
+        $sections = Section::where('subject_id', $subjectId)->pluck('id', 'code')->firstOrCreate();
+        $chapters = Chapter::where('subject_id', $subjectId)->pluck('id', 'code')->firstOrCreate();
+        $topics = Topic::pluck('id', 'code')->firstOrCreate();
+        $objectives = Objective::pluck('id', 'code')->firstOrCreate();
 
         $batchSize = 100;
         $processedRows = 0;
