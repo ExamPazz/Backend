@@ -221,6 +221,8 @@ class CsvImportController extends Controller
 
     public function importCsv(Request $request)
     {
+        set_time_limit(0); // Removes time limit
+        
         $request->validate([
             'question_file' => ['required', 'file', 'mimes:csv,txt,xlsx'],
             'subject_id' => ['required', 'exists:subjects,id'],
