@@ -93,16 +93,19 @@ class MockExamService
 
                         // Query to get questions for this section
                         $sectionQuestions = Question::query()
-                            ->where('subject_id', $subject_id)
-                            ->where(function ($query) use ($latestPercentage, $sectionIdentifier) {
-                                if ($latestPercentage->section) {
-                                    $query->where('section_id', $latestPercentage->section->id);
-                                }
-                            })
-                            ->inRandomOrder()
-                            ->limit($questionsNeeded)
-                            ->pluck('id')
-                            ->toArray();
+                        ->where('subject_id', $subject_id)
+                        ->where(function ($query) use ($latestPercentage, $sectionIdentifier) {
+                            if ($latestPercentage->section) {
+                                $query->where('section_id', $latestPercentage->section->id);
+                            }
+                        })
+                        ->whereHas('questionOptions', function ($query) {
+                            $query->whereNotNull('value')->where('value', '!=', '');
+                        }, '>=', 4) // Ensure there are at least 4 valid options
+                        ->inRandomOrder()
+                        ->limit($questionsNeeded)
+                        ->pluck('id')
+                        ->toArray();
 
                         $selectedQuestionIds = array_merge($selectedQuestionIds, $sectionQuestions);
                     }
@@ -112,12 +115,15 @@ class MockExamService
                     if (count($selectedQuestionIds) < $totalQuestionsNeeded) {
                         $remainingNeeded = $totalQuestionsNeeded - count($selectedQuestionIds);
                         $remainingQuestions = Question::query()
-                            ->where('subject_id', $subject_id)
-                            ->whereNotIn('id', $selectedQuestionIds)
-                            ->inRandomOrder()
-                            ->limit($remainingNeeded)
-                            ->pluck('id')
-                            ->toArray();
+                        ->where('subject_id', $subject_id)
+                        ->whereNotIn('id', $selectedQuestionIds)
+                        ->whereHas('questionOptions', function ($query) {
+                            $query->whereNotNull('value')->where('value', '!=', '');
+                        }, '>=', 4)
+                        ->inRandomOrder()
+                        ->limit($remainingNeeded)
+                        ->pluck('id')
+                        ->toArray();
 
                         $selectedQuestionIds = array_merge($selectedQuestionIds, $remainingQuestions);
                     }
@@ -140,17 +146,19 @@ class MockExamService
 
             foreach ($subjects_ids as $subjectId) {
                 $questions = Question::query()
-                    ->select(['id', 'year', 'question', 'image_url', 'subject_id', 'topic_id', 'objective_id'])
-                    ->with([
-                        'questionOptions' => function ($query) {
-                            $query->select(['id', 'question_id', 'value']);
-                        },
-                        'topic:id,body',
-                        'objective:id,body'
-                    ])
-                    ->whereIn('id', $questionIds[$subjectId])
-                    ->get();
-
+                ->select(['id', 'year', 'question', 'image_url', 'subject_id', 'topic_id', 'objective_id'])
+                ->with([
+                    'questionOptions' => function ($query) {
+                        $query->select(['id', 'question_id', 'value'])
+                            ->whereNotNull('value')
+                            ->where('value', '!=', '');
+                    },
+                    'topic:id,body',
+                    'objective:id,body'
+                ])
+                ->whereIn('id', $questionIds[$subjectId])
+                ->has('questionOptions', '>=', 4) // Ensure minimum of 4 valid options
+                ->get();
                 //Structure response
 
                 $groupedQuestions[ucwords($subjects_models[$subjectId]->name)] = [
