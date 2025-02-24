@@ -3,7 +3,7 @@
 use App\Http\Controllers\Admin\SubscriptionPlanController;
 use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\ExamDetailController;
-use App\Http\Controllers\GoogleAuthController;
+use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\OTPController;
 use App\Http\Controllers\RegistrationController;
@@ -61,7 +61,6 @@ Route::group(
         Route::post('password/reset', [ResetPasswordController::class, 'reset']);
         Route::post('password/reset/code/resend', [ResetPasswordController::class, 'resendOtp']);
         Route::post('code/send/whatsapp', [OTPController::class, 'sendViaWhatsApp']);
-        Route::post('auth/google', [GoogleAuthController::class, 'store']);
         Route::post('/user/restore', [UserProfileController::class, 'restore']);
         Route::post('/convert-images', [CsvImportController::class, 'convertImages']);
 
@@ -175,4 +174,12 @@ Route::group(
 
         Route::post('contact', [ContactFormController::class, 'submit']);
 
+    
+        Route::group([
+            'prefix' => 'auth/google',
+            'middleware' => ['api'],
+        ], function () {
+            Route::get('url', [GoogleAuthController::class, 'getAuthUrl']);
+            Route::post('callback', [GoogleAuthController::class, 'handleCallback']);
+        });
     });
