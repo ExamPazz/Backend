@@ -72,7 +72,7 @@ Route::group(
                 return Socialite::driver('google')->redirect();
             });
 
-            Route::get('auth/callback', function () {
+            Route::post('auth/callback', function () {
                 Log::info('Google callback route accessed', request()->all());
                 $googleUser = Socialite::driver('google')->stateless()->user();
                 $user = User::updateOrCreate(
