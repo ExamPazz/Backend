@@ -62,6 +62,7 @@ Route::group(
         Route::post('code/send/whatsapp', [OTPController::class, 'sendViaWhatsApp']);
         Route::post('auth/google', [GoogleAuthController::class, 'store']);
         Route::post('/user/restore', [UserProfileController::class, 'restore']);
+        Route::post('/convert-images', [CsvImportController::class, 'convertImages']);
 
 
         Route::middleware(['web'])->group(function () {
