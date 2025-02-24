@@ -30,6 +30,7 @@ use App\Http\Controllers\UtmeDateController;
 use App\Http\Controllers\ExamGenerationPercentageController;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Laravel\Socialite\Facades\Socialite;
 
 /*
@@ -71,6 +72,7 @@ Route::group(
             });
 
             Route::get('auth/callback', function () {
+                Log::info('Google callback route accessed', request()->all());
                 $googleUser = Socialite::driver('google')->stateless()->user();
 
                 $user = User::updateOrCreate(
