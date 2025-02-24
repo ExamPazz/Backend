@@ -3,7 +3,7 @@
 use App\Http\Controllers\Admin\SubscriptionPlanController;
 use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\ExamDetailController;
-use App\Http\Controllers\GoogleAuthController;
+use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\OTPController;
 use App\Http\Controllers\RegistrationController;
@@ -30,6 +30,7 @@ use App\Http\Controllers\UtmeDateController;
 use App\Http\Controllers\ExamGenerationPercentageController;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Laravel\Socialite\Facades\Socialite;
 
 /*
@@ -60,7 +61,6 @@ Route::group(
         Route::post('password/reset', [ResetPasswordController::class, 'reset']);
         Route::post('password/reset/code/resend', [ResetPasswordController::class, 'resendOtp']);
         Route::post('code/send/whatsapp', [OTPController::class, 'sendViaWhatsApp']);
-        Route::post('auth/google', [GoogleAuthController::class, 'store']);
         Route::post('/user/restore', [UserProfileController::class, 'restore']);
         Route::post('/convert-images', [CsvImportController::class, 'convertImages']);
 
@@ -71,7 +71,8 @@ Route::group(
                 return Socialite::driver('google')->redirect();
             });
 
-            Route::get('auth/callback', function () {
+            Route::post('auth/callback', function () {
+                Log::info('Google callback route accessed', request()->all());
                 $googleUser = Socialite::driver('google')->stateless()->user();
                 $user = User::updateOrCreate(
                     ['email' => $googleUser->email],
@@ -173,4 +174,12 @@ Route::group(
 
         Route::post('contact', [ContactFormController::class, 'submit']);
 
+    
+        Route::group([
+            'prefix' => 'auth/google',
+            'middleware' => ['api'],
+        ], function () {
+            Route::get('url', [GoogleAuthController::class, 'getAuthUrl']);
+            Route::post('callback', [GoogleAuthController::class, 'handleCallback']);
+        });
     });

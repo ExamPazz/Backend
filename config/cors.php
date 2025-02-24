@@ -34,7 +34,7 @@ return [
 
         'paths' => ['api/*', 'auth/*'],
         'allowed_methods' => ['*'],
-        'allowed_origins' => ['https://exampazz.com'],
+        'allowed_origins' => ['*'],
         'allowed_headers' => ['*'],
         'supports_credentials' => true,
 ];
