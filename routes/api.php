@@ -95,9 +95,9 @@ Route::group(
                     ]);
                 }
 
-                $redirectUrl = session('redirect_url', url('/dashboard')); // Default to dashboard if no previous URL
+                $redirectUrl = session('redirect_url', 'https://exampazz.com/dashboard');
 
-                return redirect($redirectUrl)->with([
+                return redirect()->away($redirectUrl)->with([
                     'message' => 'Authenticated successfully',
                     'user' => $user->load('subscription.subscriptionPlan'),
                     'has_exam_detail' => $hasExamDetail,
