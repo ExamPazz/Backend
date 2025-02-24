@@ -238,6 +238,12 @@ class CsvImportController extends Controller
         $chapters = Chapter::where('subject_id', $subjectId)->pluck('id', 'code');
         $topics = Topic::pluck('id', 'code');
         $objectives = Objective::pluck('id', 'code');
+<<<<<<< Updated upstream
+=======
+
+
+
+>>>>>>> Stashed changes
 
         $batchSize = 100;
         $processedRows = 0;
@@ -276,6 +282,7 @@ class CsvImportController extends Controller
                         $sectionName, $chapterNumber, $topicName, $objectiveName
                     ] = $row;
 
+<<<<<<< Updated upstream
                     $year = is_numeric($year) && strlen($year) === 4 ? (int)$year : null;
 
                     if (is_null($year)) {
@@ -290,6 +297,25 @@ class CsvImportController extends Controller
                         continue;
                     }
 
+=======
+                    // Validate relationships using cached data
+                            $sectionId = $sections[$sectionName] ?? Section::firstOrCreate([
+                                'code' => $sectionName, 'subject_id' => $subjectId
+                            ])->id;
+                            
+                            $chapterId = $chapters[$chapterNumber] ?? Chapter::firstOrCreate([
+                                'code' => $chapterNumber, 'subject_id' => $subjectId
+                            ])->id;
+                            
+                            $topicId = $topics[$topicName] ?? Topic::firstOrCreate([
+                                'code' => $topicName
+                            ])->id;
+                            
+                            $objectiveId = $objectives[$objectiveName] ?? Objective::firstOrCreate([
+                                'code' => $objectiveName
+                            ])->id;
+                            
+>>>>>>> Stashed changes
                     // Process image if needed
                     $imageUrl = null;
                     if (!empty($image) && str_contains($image, 'drive.google.com')) {
