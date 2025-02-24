@@ -417,8 +417,12 @@ class CsvImportController extends Controller
 
             if ($response->successful()) {
                 $fileName = 'images/' . uniqid() . '.png';
-                Storage::disk('public')->put($fileName, $response->body());
-                return asset('storage/' . $fileName);
+                
+                // Store the image in S3
+                Storage::disk('s3')->put($fileName, $response->body(), 'public');
+
+                // Return the public URL
+                return Storage::disk('s3')->url($fileName);
             }
         } catch (\Exception $e) {
             Log::error("Failed to convert image: {$e->getMessage()}");
