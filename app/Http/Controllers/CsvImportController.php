@@ -324,78 +324,105 @@ class CsvImportController extends Controller
         }
     }
 
-    public function convertImages()
-{
-    try {
-        $questionsWithImages = Question::where('image_url', 'like', '%drive.google.com%')->get();
-        $optionsWithImages = QuestionOption::where('value', 'like', '%drive.google.com%')->get();
-
-        $convertedCount = 0;
-
-        foreach ($questionsWithImages as $question) {
-            $convertedUrl = $this->convertAndStoreImage($question->image_url);
-
-            if ($convertedUrl) {
-                $question->update(['image_url' => $convertedUrl]);
-                $convertedCount++;
-            }
-        }
-
-        foreach ($optionsWithImages as $option) {
-            $convertedUrl = $this->convertAndStoreImage($option->value);
-
-            if ($convertedUrl) {
-                $option->update(['value' => $convertedUrl]);
-                $convertedCount++;
-            }
-        }
-
-        return response()->json([
-            'message' => 'Image conversion completed.',
-            'converted_images' => $convertedCount
+    public function convertImages(Request $request)
+    {
+        $request->validate([
+            'subject_id' => ['required', 'exists:subjects,id'],
         ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'error' => 'Image conversion failed: ' . $e->getMessage()
-        ], 500);
+
+        $subjectId = $request->input('subject_id');
+
+        try {
+            $convertedCount = 0;
+
+            // 📝 Fetch questions with images in `image_url` or `solution`
+            $questionsWithImages = Question::where('subject_id', $subjectId)
+                ->where(function ($query) {
+                    $query->where('image_url', 'like', '%drive.google.com%')
+                        ->orWhere('solution', 'like', '%drive.google.com%');
+                })
+                ->get();
+
+            // 📝 Fetch options with images
+            $optionsWithImages = QuestionOption::whereHas('question', function ($query) use ($subjectId) {
+                    $query->where('subject_id', $subjectId);
+                })
+                ->where('value', 'like', '%drive.google.com%')
+                ->get();
+
+            // 🔄 Convert images in `questions` (image_url & solution)
+            foreach ($questionsWithImages as $question) {
+                $updatedFields = [];
+
+                if ($question->image_url && $convertedUrl = $this->convertAndStoreImage($question->image_url)) {
+                    $updatedFields['image_url'] = $convertedUrl;
+                    $convertedCount++;
+                }
+
+                if ($question->solution && $convertedSolutionUrl = $this->convertAndStoreImage($question->solution)) {
+                    $updatedFields['solution'] = $convertedSolutionUrl;
+                    $convertedCount++;
+                }
+
+                if (!empty($updatedFields)) {
+                    $question->update($updatedFields);
+                }
+            }
+
+            // 🔄 Convert images in `question_options`
+            foreach ($optionsWithImages as $option) {
+                if ($convertedUrl = $this->convertAndStoreImage($option->value)) {
+                    $option->update(['value' => $convertedUrl]);
+                    $convertedCount++;
+                }
+            }
+
+            return response()->json([
+                'message' => 'Image conversion completed.',
+                'converted_images' => $convertedCount,
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Image conversion failed: ' . $e->getMessage(),
+            ], 500);
+        }
     }
-}
 
-private function convertAndStoreImage($url)
-{
-    $directUrl = $this->convertGoogleDriveUrl($url);
+    private function convertAndStoreImage($url)
+    {
+        $directUrl = $this->convertGoogleDriveUrl($url);
 
-    if (!$directUrl) {
+        if (!$directUrl) {
+            return null;
+        }
+
+        try {
+            $response = Http::withoutVerifying()->get($directUrl);
+
+            if ($response->successful()) {
+                $fileName = 'images/' . uniqid() . '.png';
+                Storage::disk('public')->put($fileName, $response->body());
+                return asset('storage/' . $fileName);
+            }
+        } catch (\Exception $e) {
+            Log::error("Failed to convert image: {$e->getMessage()}");
+        }
+
         return null;
     }
 
-    try {
-        $response = Http::withoutVerifying()->get($directUrl);
-
-        if ($response->successful()) {
-            $fileName = 'images/' . uniqid() . '.png';
-            Storage::disk('public')->put($fileName, $response->body());
-            return asset('storage/' . $fileName);
+    private function convertGoogleDriveUrl($url)
+    {
+        if (preg_match('/drive\.google\.com\/file\/d\/([^\/]+)\//', $url, $matches)) {
+            return 'https://drive.google.com/uc?export=download&id=' . $matches[1];
         }
-    } catch (\Exception $e) {
-        Log::error("Failed to convert image: {$e->getMessage()}");
+
+        if (preg_match('/drive\.google\.com\/open\?id=([^&]+)/', $url, $matches)) {
+            return 'https://drive.google.com/uc?export=download&id=' . $matches[1];
+        }
+
+        return null;
     }
-
-    return null;
-}
-
-private function convertGoogleDriveUrl($url)
-{
-    if (preg_match('/drive\.google\.com\/file\/d\/([^\/]+)\//', $url, $matches)) {
-        return 'https://drive.google.com/uc?export=download&id=' . $matches[1];
-    }
-
-    if (preg_match('/drive\.google\.com\/open\?id=([^&]+)/', $url, $matches)) {
-        return 'https://drive.google.com/uc?export=download&id=' . $matches[1];
-    }
-
-    return null;
-}
-
 
 }
