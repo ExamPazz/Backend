@@ -1,0 +1,69 @@
+name: Deploy Application to production Server
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: 8.3
+
+    - name: Install Composer Dependencies
+      run: composer install --optimize-autoloader --no-dev --no-progress --no-interaction --prefer-dist
+
+    - name: Install Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install NPM Dependencies
+      run: npm install
+
+    - name: Build NPM Assets
+      run: npm run build
+
+    - name: Run Remote/Artisan Commands
+      uses: appleboy/ssh-action@v1.2.0
+      with:
+        host: ${{ secrets.VPS_HOST_PROD }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          sudo rm -rf /var/www/html/exampazz-backend
+          sudo mkdir /var/www/html/exampazz-backend
+          sudo chown -R $USER:www-data /var/www/html/exampazz-backend
+          cp ~/exampazz/.env /var/www/html/exampazz-backend/
+
+    - name: Synchronize Files To Server
+      uses: easingthemes/ssh-deploy@v5.1.0
+      with:
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        SOURCE: "."
+        REMOTE_HOST: ${{ secrets.VPS_HOST_PROD }}
+        REMOTE_USER: ${{ secrets.VPS_USER }}
+        TARGET: "/var/www/html/exampazz-backend"
+        EXCLUDE: "/node_modules/"
+        
+
+    - name: Run Remote/Artisan Commands
+      uses: appleboy/ssh-action@v1.2.0
+      with:
+        host: ${{ secrets.VPS_HOST_PROD }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          cd /var/www/html/exampazz-backend
+          sudo find . -type f -exec chmod 664 {} \;   
+          sudo find . -type d -exec chmod 775 {} \;
+          sudo chgrp -R www-data storage bootstrap/cache
+          sudo chmod -R ug+rwx storage bootstrap/cache
+          php artisan key:generate && php artisan migrate && php artisan config:cache && php artisan view:cache && php artisan route:cache;
+          
