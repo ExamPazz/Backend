@@ -225,94 +225,72 @@ class CsvImportController extends Controller
             'question_file' => ['required', 'file', 'mimes:csv,txt,xlsx'],
             'subject_id' => ['required', 'exists:subjects,id'],
         ]);
-
+    
         $filePath = $request->file('question_file');
         $subjectId = $request->input('subject_id');
-
+    
         if (!file_exists($filePath) || !is_readable($filePath)) {
             return response()->json(['error' => 'CSV file not found or not readable'], 400);
         }
-
-        // Pre-fetch and cache relationships
-        $sections = Section::where('subject_id', $subjectId)->pluck('id', 'code')->firstOrCreate();
-        $chapters = Chapter::where('subject_id', $subjectId)->pluck('id', 'code')->firstOrCreate();
-        $topics = Topic::pluck('id', 'code')->firstOrCreate();
-        $objectives = Objective::pluck('id', 'code')->firstOrCreate();
-
-
-
-
+    
         $batchSize = 100;
         $processedRows = 0;
-
+    
         DB::beginTransaction();
-
+    
         try {
+            $sections = $chapters = $topics = $objectives = [];
+    
             $rows = LazyCollection::make(function () use ($filePath) {
                 $handle = fopen($filePath->getRealPath(), 'r');
                 fgetcsv($handle); // Skip header
-
                 while ($row = fgetcsv($handle)) {
                     yield $row;
                 }
-
                 fclose($handle);
             });
-
-            // Process in chunks
-            $rows->chunk($batchSize)->each(function ($chunk) use (
-                $subjectId,
-                $sections,
-                $chapters,
-                $topics,
-                $objectives,
-                $processedRows
-            ) {
+    
+            $rows->chunk($batchSize)->each(function ($chunk) use (&$sections, &$chapters, &$topics, &$objectives, $subjectId, &$processedRows) {
                 $questionData = [];
-                $optionsData = [];
-
-                // First pass: Prepare question and option data
+    
                 foreach ($chunk as $row) {
                     [
                         $serial, $year, $questionText, $image, $optionA, $optionB,
                         $optionC, $optionD, $optionE, $correctOption, $solution,
                         $sectionName, $chapterNumber, $topicName, $objectiveName
                     ] = $row;
-
-                    // Validate relationships using cached data
-                            $sectionId = $sections[$sectionName] ?? Section::firstOrCreate([
-                                'code' => $sectionName, 'subject_id' => $subjectId
-                            ])->id;
-                            
-                            $chapterId = $chapters[$chapterNumber] ?? Chapter::firstOrCreate([
-                                'code' => $chapterNumber, 'subject_id' => $subjectId
-                            ])->id;
-                            
-                            $topicId = $topics[$topicName] ?? Topic::firstOrCreate([
-                                'code' => $topicName
-                            ])->id;
-                            
-                            $objectiveId = $objectives[$objectiveName] ?? Objective::firstOrCreate([
-                                'code' => $objectiveName
-                            ])->id;
-                            
-                    // Process image if needed
-                    $imageUrl = null;
-                    if (!empty($image) && str_contains($image, 'drive.google.com')) {
-                        $imageUrl = $this->storeGoogleDriveImage($this->convertGoogleDriveUrl($image));
-                    }
-
-                    // Store question data with its options for later processing
+    
+                    // Validate and create relationships if not found in cached collections
+                    $sectionId = $sections[$sectionName] ??= Section::firstOrCreate([
+                        'code' => $sectionName, 'subject_id' => $subjectId
+                    ])->id;
+    
+                    $chapterId = $chapters[$chapterNumber] ??= Chapter::firstOrCreate([
+                        'code' => $chapterNumber, 'subject_id' => $subjectId
+                    ])->id;
+    
+                    $topicId = $topics[$topicName] ??= Topic::firstOrCreate([
+                        'code' => $topicName
+                    ])->id;
+    
+                    $objectiveId = $objectives[$objectiveName] ??= Objective::firstOrCreate([
+                        'code' => $objectiveName
+                    ])->id;
+    
+                    $imageUrl = (!empty($image) && str_contains($image, 'drive.google.com'))
+                        ? $this->storeGoogleDriveImage($this->convertGoogleDriveUrl($image))
+                        : null;
+    
                     $questionData[] = [
                         'question' => [
                             'year' => $year,
                             'question' => $questionText,
                             'image_url' => $imageUrl,
                             'solution' => $solution,
-                            'section_id' => $sections[$sectionName],
-                            'chapter_id' => $chapters[$chapterNumber],
-                            'topic_id' => $topics[$topicName],
-                            'objective_id' => $objectives[$objectiveName],
+                            'section_id' => $sectionId,
+                            'chapter_id' => $chapterId,
+                            'topic_id' => $topicId,
+                            'objective_id' => $objectiveId,
                             'subject_id' => $subjectId,
                             'created_at' => now(),
                             'updated_at' => now(),
@@ -323,63 +301,58 @@ class CsvImportController extends Controller
                         ]
                     ];
                 }
-
-                // Second pass: Insert questions and their options maintaining relationship
-                foreach (array_chunk($questionData, 50) as $chunk) {
-                    // Insert questions
-                    $questions = array_column($chunk, 'question');
-                    $firstId = DB::table('questions')->insertGetId($questions[0]);
-
-                    if (count($questions) > 1) {
-                        DB::table('questions')->insert(array_slice($questions, 1));
+    
+                // Insert questions and options
+                foreach (array_chunk($questionData, 50) as $questionChunk) {
+                    $questions = array_column($questionChunk, 'question');
+                    $firstId = DB::table('questions')->insertGetId(array_shift($questions));
+    
+                    if ($questions) {
+                        DB::table('questions')->insert($questions);
                     }
-
-                    // Process options for these questions
+    
                     $currentId = $firstId;
-                    foreach ($chunk as $data) {
-                        $optionLabels = ['A', 'B', 'C', 'D', 'E'];
-
-                        foreach ($data['options']['values'] as $i => $option) {
+                    $optionsData = [];
+    
+                    foreach ($questionChunk as $data) {
+                        foreach (['A', 'B', 'C', 'D', 'E'] as $i => $label) {
+                            $option = $data['options']['values'][$i] ?? null;
                             if (empty($option)) continue;
-
+    
                             $optionValue = str_contains($option, 'drive.google.com')
                                 ? $this->storeGoogleDriveImage($this->convertGoogleDriveUrl($option))
                                 : $option;
-
+    
                             $optionsData[] = [
                                 'question_id' => $currentId,
                                 'value' => $optionValue,
-                                'is_correct' => $data['options']['correct'] === $optionLabels[$i],
+                                'is_correct' => $data['options']['correct'] === $label,
                                 'created_at' => now(),
                                 'updated_at' => now(),
                             ];
                         }
                         $currentId++;
                     }
-
-                    // Insert options for this chunk immediately
-                    if (!empty($optionsData)) {
-                        foreach (array_chunk($optionsData, 50) as $optionsChunk) {
-                            DB::table('question_options')->insert($optionsChunk);
+    
+                    if ($optionsData) {
+                        foreach (array_chunk($optionsData, 50) as $chunk) {
+                            DB::table('question_options')->insert($chunk);
                         }
-                        $optionsData = []; // Clear options array after insertion
                     }
                 }
-
+    
                 $processedRows += count($questionData);
             });
-
+    
             DB::commit();
-
+    
             return response()->json([
                 'message' => 'CSV data imported successfully!',
                 'processed_rows' => $processedRows
             ]);
-
+    
         } catch (\Exception $e) {
-            $e->getMessage();
-            // DB::rollBack();
-
+            DB::rollBack();
             return response()->json([
                 'error' => 'Failed to import CSV data: ' . $e->getMessage()
             ], 500);
