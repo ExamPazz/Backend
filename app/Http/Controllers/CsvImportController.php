@@ -274,8 +274,9 @@ class CsvImportController extends Controller
                     ])->id;
     
                     $objectiveId = $objectives[$objectiveName] ??= Objective::firstOrCreate([
-                        'code' => $objectiveName
-                    ])->id;
+                        'code' => $objectiveName,
+                        'topic_id' => $topicId,  // Add this line
+                    ])->id;                    
     
                     $imageUrl = (!empty($image) && str_contains($image, 'drive.google.com'))
                         ? $this->storeGoogleDriveImage($this->convertGoogleDriveUrl($image))
