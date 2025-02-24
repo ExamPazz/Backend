@@ -238,12 +238,9 @@ class CsvImportController extends Controller
         $chapters = Chapter::where('subject_id', $subjectId)->pluck('id', 'code');
         $topics = Topic::pluck('id', 'code');
         $objectives = Objective::pluck('id', 'code');
-<<<<<<< Updated upstream
-=======
 
 
 
->>>>>>> Stashed changes
 
         $batchSize = 100;
         $processedRows = 0;
@@ -282,22 +279,6 @@ class CsvImportController extends Controller
                         $sectionName, $chapterNumber, $topicName, $objectiveName
                     ] = $row;
 
-<<<<<<< Updated upstream
-                    $year = is_numeric($year) && strlen($year) === 4 ? (int)$year : null;
-
-                    if (is_null($year)) {
-                        // \Illuminate\Support\Facades\Log::warning("Skipping row due to invalid or empty year", compact('row'));
-                        continue; // Skip rows with invalid or empty year
-                    }
-                    if (!isset($sections[$sectionName]) ||
-                        !isset($chapters[$chapterNumber]) ||
-                        !isset($topics[$topicName]) ||
-                        !isset($objectives[$objectiveName])) {
-
-                        continue;
-                    }
-
-=======
                     // Validate relationships using cached data
                             $sectionId = $sections[$sectionName] ?? Section::firstOrCreate([
                                 'code' => $sectionName, 'subject_id' => $subjectId
@@ -315,7 +296,6 @@ class CsvImportController extends Controller
                                 'code' => $objectiveName
                             ])->id;
                             
->>>>>>> Stashed changes
                     // Process image if needed
                     $imageUrl = null;
                     if (!empty($image) && str_contains($image, 'drive.google.com')) {
