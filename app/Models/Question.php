@@ -42,4 +42,10 @@ class Question extends Model
     {
         return $this->belongsTo(Objective::class);
     }
+
+    public function options()
+    {
+        return $this->hasMany(QuestionOption::class);
+    }
+
 }

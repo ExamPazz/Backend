@@ -62,6 +62,7 @@ Route::group(
         Route::post('code/send/whatsapp', [OTPController::class, 'sendViaWhatsApp']);
         Route::post('auth/google', [GoogleAuthController::class, 'store']);
         Route::post('/user/restore', [UserProfileController::class, 'restore']);
+        Route::post('/convert-images', [CsvImportController::class, 'convertImages']);
 
 
         Route::middleware(['web'])->group(function () {
@@ -72,7 +73,6 @@ Route::group(
 
             Route::get('auth/callback', function () {
                 $googleUser = Socialite::driver('google')->stateless()->user();
-
                 $user = User::updateOrCreate(
                     ['email' => $googleUser->email],
                     [
@@ -87,16 +87,17 @@ Route::group(
                 $freemiumPlan = SubscriptionPlan::where('name', 'freemium')->first();
 
                 if ($freemiumPlan) {
-                    Subscription::create([
+                    Subscription::firstOrCreate([
                         'user_id' => $user->id,
                         'subscription_plan_id' => $freemiumPlan->id,
+                    ], [
                         'expires_at' => now()->addDays(30),
                     ]);
                 }
 
-                $redirectUrl = session('redirect_url', url('/dashboard')); // Default to dashboard if no previous URL
+                $redirectUrl = session('redirect_url', 'https://exampazz.com/dashboard');
 
-                return redirect($redirectUrl)->with([
+                return redirect()->away($redirectUrl)->with([
                     'message' => 'Authenticated successfully',
                     'user' => $user->load('subscription.subscriptionPlan'),
                     'has_exam_detail' => $hasExamDetail,
