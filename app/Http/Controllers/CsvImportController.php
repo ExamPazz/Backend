@@ -339,15 +339,15 @@ class CsvImportController extends Controller
             // 🔄 Process questions in chunks (image_url & solution)
             Question::where('subject_id', $subjectId)
                 ->where(function ($query) {
-                    $query->where('image_url', 'like', '%drive.google.com%')
-                        ->orWhere('solution', 'like', '%drive.google.com%');
+                    $query->where('image_url', 'like', '%exampazz-img.s3.%')
+                        ->orWhere('solution', 'like', '%exampazz-img.s3.%');
                 })
                 ->chunk(100, function ($questions) use (&$convertedCount, &$failedConversions) {
                     foreach ($questions as $question) {
                         $updatedFields = [];
 
-                        // 🖼️ Convert image_url if still Google Drive URL
-                        if ($question->image_url && str_contains($question->image_url, 'drive.google.com')) {
+                        // 🖼️ Convert image_url if it matches S3 URL pattern
+                        if ($question->image_url && str_contains($question->image_url, 'exampazz-img.s3.')) {
                             $convertedUrl = $this->convertAndStoreImage($question->image_url);
                             if ($convertedUrl) {
                                 $updatedFields['image_url'] = $convertedUrl;
@@ -357,8 +357,8 @@ class CsvImportController extends Controller
                             }
                         }
 
-                        // 📝 Convert solution if still Google Drive URL
-                        if ($question->solution && str_contains($question->solution, 'drive.google.com')) {
+                        // 📝 Convert solution if it matches S3 URL pattern
+                        if ($question->solution && str_contains($question->solution, 'exampazz-img.s3.')) {
                             $convertedSolutionUrl = $this->convertAndStoreImage($question->solution);
                             if ($convertedSolutionUrl) {
                                 $updatedFields['solution'] = $convertedSolutionUrl;
@@ -378,7 +378,7 @@ class CsvImportController extends Controller
             QuestionOption::whereHas('question', function ($query) use ($subjectId) {
                     $query->where('subject_id', $subjectId);
                 })
-                ->where('value', 'like', '%drive.google.com%')
+                ->where('value', 'like', '%exampazz-img.s3.%')
                 ->chunk(100, function ($options) use (&$convertedCount, &$failedConversions) {
                     foreach ($options as $option) {
                         $convertedUrl = $this->convertAndStoreImage($option->value);
