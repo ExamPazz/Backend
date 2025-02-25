@@ -119,6 +119,7 @@ Route::group(
         Route::post('keys/import/maths', [ImportKeyController::class, 'importStructureForMaths']);
         Route::post('keys/import/acc', [ImportKeyController::class, 'importStructureForAcc']);
         Route::post('keys/import/phy', [ImportKeyController::class, 'importStructureForPhy']);
+        Route::post('images', [CsvImportController::class, 'imageS3']);
 
 
 

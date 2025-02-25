@@ -446,4 +446,13 @@ class CsvImportController extends Controller
         return null;
     }
 
+    public function imageS3()
+    {
+        $files = Storage::disk('s3')->files('images');
+
+        foreach ($files as $file) {
+            echo Storage::disk('s3')->url($file) . PHP_EOL;
+        }
+    }
+
 }
