@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\LazyCollection;
 use Illuminate\Support\Str;
+use Intervention\Image\Facades\Image;
 
 class CsvImportController extends Controller
 {
@@ -329,105 +330,98 @@ class CsvImportController extends Controller
         $request->validate([
             'subject_id' => ['required', 'exists:subjects,id'],
         ]);
-
+    
         $subjectId = $request->input('subject_id');
-
+    
         try {
             $convertedCount = 0;
             $failedConversions = [];
-
-            // 🔄 Process questions in chunks (image_url & solution)
+    
+            // 🔄 Process questions (image_url & solution)
             Question::where('subject_id', $subjectId)
                 ->where(function ($query) {
-                    $query->where('image_url', 'like', '%exampazz-img.s3.%')
-                        ->orWhere('solution', 'like', '%exampazz-img.s3.%');
+                    $query->where('image_url', 'like', '%exampazz-img.s3.%png%')
+                          ->orWhere('solution', 'like', '%exampazz-img.s3.%png%');
                 })
                 ->chunk(100, function ($questions) use (&$convertedCount, &$failedConversions) {
                     foreach ($questions as $question) {
                         $updatedFields = [];
-
-                        // 🖼️ Convert image_url if it matches S3 URL pattern
-                        if ($question->image_url && str_contains($question->image_url, 'exampazz-img.s3.')) {
-                            $convertedUrl = $this->convertAndStoreImage($question->image_url);
-                            if ($convertedUrl) {
-                                $updatedFields['image_url'] = $convertedUrl;
+    
+                        if ($question->image_url && str_contains($question->image_url, '.png')) {
+                            $jpegUrl = $this->convertAndUploadToNewBucket($question->image_url);
+                            if ($jpegUrl) {
+                                $updatedFields['image_url'] = $jpegUrl;
                                 $convertedCount++;
                             } else {
                                 $failedConversions[] = ['type' => 'question_image', 'id' => $question->id];
                             }
                         }
-
-                        // 📝 Convert solution if it matches S3 URL pattern
-                        if ($question->solution && str_contains($question->solution, 'exampazz-img.s3.')) {
-                            $convertedSolutionUrl = $this->convertAndStoreImage($question->solution);
-                            if ($convertedSolutionUrl) {
-                                $updatedFields['solution'] = $convertedSolutionUrl;
+    
+                        if ($question->solution && str_contains($question->solution, '.png')) {
+                            $jpegUrl = $this->convertAndUploadToNewBucket($question->solution);
+                            if ($jpegUrl) {
+                                $updatedFields['solution'] = $jpegUrl;
                                 $convertedCount++;
                             } else {
                                 $failedConversions[] = ['type' => 'question_solution', 'id' => $question->id];
                             }
                         }
-
+    
                         if (!empty($updatedFields)) {
                             $question->update($updatedFields);
                         }
                     }
                 });
-
-            // 🔄 Process options in chunks
+    
+            // 🔄 Process options
             QuestionOption::whereHas('question', function ($query) use ($subjectId) {
                     $query->where('subject_id', $subjectId);
                 })
-                ->where('value', 'like', '%exampazz-img.s3.%')
+                ->where('value', 'like', '%exampazz-img.s3.%png%')
                 ->chunk(100, function ($options) use (&$convertedCount, &$failedConversions) {
                     foreach ($options as $option) {
-                        $convertedUrl = $this->convertAndStoreImage($option->value);
-                        if ($convertedUrl) {
-                            $option->update(['value' => $convertedUrl]);
+                        $jpegUrl = $this->convertAndUploadToNewBucket($option->value);
+                        if ($jpegUrl) {
+                            $option->update(['value' => $jpegUrl]);
                             $convertedCount++;
                         } else {
                             $failedConversions[] = ['type' => 'option', 'id' => $option->id];
                         }
                     }
                 });
-
+    
             return response()->json([
-                'message' => 'Image conversion completed.',
+                'message' => 'PNG to JPEG conversion completed.',
                 'converted_images' => $convertedCount,
                 'failed_conversions' => $failedConversions,
             ]);
-
+    
         } catch (\Exception $e) {
             return response()->json([
-                'error' => 'Image conversion failed: ' . $e->getMessage(),
+                'error' => 'Conversion failed: ' . $e->getMessage(),
             ], 500);
         }
     }
 
-    private function convertAndStoreImage($url)
+    private function convertAndUploadToNewBucket($url)
     {
-        $directUrl = $this->convertGoogleDriveUrl($url);
-
-        if (!$directUrl) {
-            return null;
-        }
-
         try {
-            $response = Http::withoutVerifying()->get($directUrl);
+            $response = Http::withoutVerifying()->get($url);
 
             if ($response->successful()) {
-                $fileName = 'images/' . uniqid() . '.png';
+                // 🖼️ Convert PNG to JPEG
+                $image = Image::make($response->body())->encode('jpeg', 85); // Adjust quality if needed
+                $fileName = 'images/' . uniqid() . '.jpeg';
 
-                // ✅ Store the image in S3 with proper visibility
-                Storage::disk('s3')->put($fileName, $response->body(), [
+                // ✅ Upload to the new S3 bucket
+                Storage::disk('s3')->put($fileName, (string) $image, [
                     'visibility' => 'public',
                 ]);
 
-                // ✅ Return the public URL
                 return Storage::disk('s3')->url($fileName);
             }
         } catch (\Exception $e) {
-            Log::error("Failed to convert image: {$e->getMessage()}");
+            Log::error("Failed to convert and upload image: {$e->getMessage()}");
         }
 
         return null;
