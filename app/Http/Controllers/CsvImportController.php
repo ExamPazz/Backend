@@ -417,11 +417,13 @@ class CsvImportController extends Controller
 
             if ($response->successful()) {
                 $fileName = 'images/' . uniqid() . '.png';
-                
-                // Store the image in S3
-                Storage::disk('s3')->put($fileName, $response->body(), 'public');
 
-                // Return the public URL
+                // ✅ Store the image in S3 with proper visibility
+                Storage::disk('s3')->put($fileName, $response->body(), [
+                    'visibility' => 'public',
+                ]);
+
+                // ✅ Return the public URL
                 return Storage::disk('s3')->url($fileName);
             }
         } catch (\Exception $e) {

@@ -13,7 +13,11 @@
         "laravel/sanctum": "^3.3",
         "laravel/socialite": "^5.17",
         "laravel/tinker": "^2.8",
+<<<<<<< Updated upstream
         "league/flysystem-aws-s3-v3": "^3.29",
+=======
+        "league/flysystem-aws-s3-v3": "*",
+>>>>>>> Stashed changes
         "php-open-source-saver/jwt-auth": "*",
         "phpoffice/phpspreadsheet": "^3.7"
     },
