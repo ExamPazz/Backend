@@ -118,7 +118,7 @@ class PerformanceAnalysisService
                     : Carbon::parse($mockExam->completed_at);
 
                 // Calculate time spent using Carbon instances
-                $totalTimeSpent = $startTime->diffInMinutes($completedAt);
+                $totalTimeSpent = $startTime->diffInSeconds($completedAt);
 
                 // Calculate scores by subject (100 points each)
                 $subjectScores = $mockExam->mockExamQuestions
