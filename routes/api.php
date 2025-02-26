@@ -62,7 +62,7 @@ Route::group(
         Route::post('password/reset/code/resend', [ResetPasswordController::class, 'resendOtp']);
         Route::post('code/send/whatsapp', [OTPController::class, 'sendViaWhatsApp']);
         Route::post('/user/restore', [UserProfileController::class, 'restore']);
-        Route::post('/convert-images', [CsvImportController::class, 'convertImages']);
+        Route::post('/convert-images', [CsvImportController::class, 'migrateImagesToCloudinaryBySubject']);
 
 
         Route::middleware(['web'])->group(function () {
