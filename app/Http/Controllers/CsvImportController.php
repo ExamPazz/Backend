@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\LazyCollection;
 use Illuminate\Support\Str;
 use Intervention\Image\Facades\Image;
+use GuzzleHttp\Client;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 
 
@@ -518,30 +519,73 @@ private function migrateToCloudinary(string $googleDriveUrl): string
         $directLink = $this->convertGoogleDriveToDirectLink($googleDriveUrl);
 
         if (!$directLink) {
-            throw new \Exception("Failed to convert Google Drive URL.");
+            throw new \Exception("Failed to convert Google Drive URL: {$googleDriveUrl}");
         }
 
-        // Download the image to a temporary file
-        $tempFile = tempnam(sys_get_temp_dir(), 'img_');
-        file_put_contents($tempFile, file_get_contents($directLink));
+        Log::info("Converted Google Drive URL: {$directLink}");
 
-        // Upload to Cloudinary using the local file path
-        $uploaded = Cloudinary::upload($tempFile, [
-            'folder' => 'exampazz',
+        $client = new Client([
+            'timeout' => 30,
+            'headers' => [
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            ],
         ]);
 
-        // Delete the temp file after upload
-        unlink($tempFile);
+        $response = $client->get($directLink, ['stream' => true]);
+
+        if ($response->getStatusCode() !== 200) {
+            throw new \Exception("Failed to download image. HTTP Status: {$response->getStatusCode()}");
+        }
+
+        $tempFile = tempnam(sys_get_temp_dir(), 'img_');
+        file_put_contents($tempFile, $response->getBody()->getContents());
+
+        if (filesize($tempFile) === 0) {
+            throw new \Exception("Downloaded file is empty.");
+        }
+
+        // Check if the file is a valid image
+        $mimeType = mime_content_type($tempFile);
+        Log::info("Downloaded file MIME type: {$mimeType}");
+
+        if (!str_starts_with($mimeType, 'image/')) {
+            unlink($tempFile);
+            throw new \Exception("Downloaded file is not an image. MIME type: {$mimeType}");
+        }
+
+        Log::info("Uploading to Cloudinary: {$tempFile}");
+
+        // Upload using 'file://' to ensure Cloudinary treats it as a local file
+        $uploaded = Cloudinary::upload(fopen($tempFile, 'r'), [
+            'folder' => 'exampazz',
+        ]);
+        
+        if (!$uploaded->getSecurePath()) {
+            throw new \Exception("Cloudinary upload failed or returned no URL.");
+        }
+
+        unlink($tempFile); // Clean up
+
+        if (!$uploaded->getSecurePath()) {
+            throw new \Exception("Cloudinary upload failed or returned no URL.");
+        }
+
+        \Log::info("Uploaded to Cloudinary URL: " . $uploaded->getSecurePath());
 
         return $uploaded->getSecurePath();
 
     } catch (\Exception $e) {
-        report($e); // Log the error
-        return $googleDriveUrl; // Fallback to the original URL if migration fails
+        \Log::error("Migration error: " . $e->getMessage());
+        return $googleDriveUrl; // Return original URL on failure
     }
 }
 
+public function test()
+{
+    $url = "https://drive.google.com/file/d/1fkX1gXafTC8fMVYY7U_FDpUsqiYTbiwx/view?usp=drive_link";
+$newUrl = $this->migrateToCloudinary($url);
 
-
+dd($newUrl); 
+}
 
 }

@@ -64,6 +64,8 @@ Route::group(
         Route::post('/user/restore', [UserProfileController::class, 'restore']);
         Route::post('/convert-images', [CsvImportController::class, 'migrateImagesToCloudinaryBySubject']);
 
+        Route::post('/test', [CsvImportController::class, 'test']);
+
 
         Route::middleware(['web'])->group(function () {
             Route::get('auth/redirect', function () {
