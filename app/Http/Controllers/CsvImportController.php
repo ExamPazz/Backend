@@ -443,76 +443,97 @@ class CsvImportController extends Controller
     }
 
     public function migrateImagesToCloudinaryBySubject(Request $request)
-    {
-        $request->validate([
-            'subject_id' => 'required|integer|exists:subjects,id',
+{
+    $request->validate([
+        'subject_id' => 'required|integer|exists:subjects,id',
+    ]);
+
+    $subjectId = $request->input('subject_id');
+    $chunkSize = 100; // Process questions in manageable chunks
+
+    DB::transaction(function () use ($chunkSize, $subjectId) {
+        // Migrate images from the questions table
+        Question::where('subject_id', $subjectId)
+            ->where(function ($query) {
+                $query->whereNotNull('image_url')->orWhereNotNull('solution');
+            })
+            ->chunkById($chunkSize, function ($questions) {
+                foreach ($questions as $question) {
+                    $updatedFields = [];
+
+                    if ($question->image_url && $this->isGoogleDriveUrl($question->image_url)) {
+                        $updatedFields['image_url'] = $this->migrateToCloudinary($question->image_url);
+                    }
+
+                    if ($question->solution && $this->isGoogleDriveUrl($question->solution)) {
+                        $updatedFields['solution'] = $this->migrateToCloudinary($question->solution);
+                    }
+
+                    if (!empty($updatedFields)) {
+                        $question->update($updatedFields);
+                    }
+                }
+            });
+
+        // Migrate images from the question_options table
+        QuestionOption::whereHas('question', function ($query) use ($subjectId) {
+            $query->where('subject_id', $subjectId);
+        })->whereNotNull('value')
+          ->chunkById($chunkSize, function ($options) {
+              foreach ($options as $option) {
+                  if ($this->isGoogleDriveUrl($option->value)) {
+                      $option->update(['value' => $this->migrateToCloudinary($option->value)]);
+                  }
+              }
+          });
+    });
+
+    return response()->json(['message' => 'Image migration to Cloudinary for the selected subject completed successfully.']);
+}
+
+/**
+ * Check if the URL is a Google Drive link.
+ */
+private function isGoogleDriveUrl(string $url): bool
+{
+    return str_contains($url, 'drive.google.com');
+}
+
+/**
+ * Convert Google Drive URL to direct download link.
+ */
+private function convertGoogleDriveToDirectLink(string $url): ?string
+{
+    if (preg_match('/drive\.google\.com\/file\/d\/([^\/]+)/', $url, $matches)) {
+        $fileId = $matches[1];
+        return "https://drive.google.com/uc?export=download&id={$fileId}";
+    }
+
+    return null;
+}
+
+/**
+ * Upload image from Google Drive to Cloudinary and return the new URL.
+ */
+private function migrateToCloudinary(string $googleDriveUrl): string
+{
+    try {
+        $directLink = $this->convertGoogleDriveToDirectLink($googleDriveUrl);
+
+        if (!$directLink) {
+            return $googleDriveUrl; // If direct link conversion fails, skip
+        }
+
+        $uploaded = Cloudinary::upload($directLink, [
+            'folder' => 'exampazz',
         ]);
 
-        $subjectId = $request->input('subject_id');
-        $chunkSize = 100; // Process questions in manageable chunks
-
-        DB::transaction(function () use ($chunkSize, $subjectId) {
-            // Migrate images from the questions table for the specified subject
-            Question::where('subject_id', $subjectId)
-                ->where(function ($query) {
-                    $query->whereNotNull('image_url')->orWhereNotNull('solution');
-                })
-                ->chunkById($chunkSize, function ($questions) {
-                    foreach ($questions as $question) {
-                        $updatedFields = [];
-
-                        if ($question->image && $this->isS3Url($question->image_url)) {
-                            $updatedFields['image_url'] = $this->migrateToCloudinary($question->image_url);
-                        }
-
-                        if ($question->solution && $this->isS3Url($question->solution)) {
-                            $updatedFields['solution'] = $this->migrateToCloudinary($question->solution);
-                        }
-
-                        if (!empty($updatedFields)) {
-                            $question->update($updatedFields);
-                        }
-                    }
-                });
-
-            // Migrate images from the question_options table related to the specified subject's questions
-            QuestionOption::whereHas('question', function ($query) use ($subjectId) {
-                $query->where('subject_id', $subjectId);
-            })->whereNotNull('value')
-              ->chunkById($chunkSize, function ($options) {
-                  foreach ($options as $option) {
-                      if ($this->isS3Url($option->value)) {
-                          $option->update(['value' => $this->migrateToCloudinary($option->value)]);
-                      }
-                  }
-              });
-        });
-
-        return response()->json(['message' => 'Image migration to Cloudinary for the selected subject completed successfully.']);
+        return $uploaded->getSecurePath();
+    } catch (\Exception $e) {
+        report($e); // Log error for debugging
+        return $googleDriveUrl; // Fallback to original URL if migration fails
     }
+}
 
-    /**
-     * Check if the URL is from AWS S3.
-     */
-    private function isS3Url(string $url): bool
-    {
-        return str_contains($url, 's3.amazonaws.com') || str_contains($url, '.s3.');
-    }
-
-    /**
-     * Upload image from S3 to Cloudinary and return the new URL.
-     */
-    private function migrateToCloudinary(string $s3Url): string
-    {
-        try {
-            $uploaded = Cloudinary::upload($s3Url, [
-                'folder' => 'exampazz',
-            ]);
-            return $uploaded->getSecurePath();
-        } catch (\Exception $e) {
-            report($e); // Log the error for debugging
-            return $s3Url; // Return the original URL if migration fails
-        }
-    }
 
 }
