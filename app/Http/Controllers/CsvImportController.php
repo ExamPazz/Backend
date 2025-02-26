@@ -460,16 +460,16 @@ class CsvImportController extends Controller
             // Migrate images from 'questions' table
             Question::where('subject_id', $subjectId)
                 ->where(function ($query) {
-                    $query->whereNotNull('image')->orWhereNotNull('solution');
+                    $query->whereNotNull('image_url')->orWhereNotNull('solution');
                 })
                 ->chunkById($chunkSize, function ($questions) use (&$processed, &$skipped, &$failed) {
                     foreach ($questions as $question) {
                         $updatedFields = [];
     
-                        if ($question->image && !$this->isCloudinaryUrl($question->image)) {
-                            $newUrl = $this->migrateToCloudinary($question->image);
+                        if ($question->image_url && !$this->isCloudinaryUrl($question->image_url)) {
+                            $newUrl = $this->migrateToCloudinary($question->image_url);
                             if ($newUrl) {
-                                $updatedFields['image'] = $newUrl;
+                                $updatedFields['image_url'] = $newUrl;
                                 $processed++;
                             } else {
                                 $failed++;
