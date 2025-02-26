@@ -115,9 +115,11 @@ class PerformanceAnalysisService
                             ->isNotEmpty();
                     })->count();
 
+                    // Update: Only count questions with non-null selected_option as attempted
                     $attemptedSubjectQuestions = $questions->filter(function ($question) use ($mockExam) {
                         return $mockExam->userAnswers
                             ->where('question_id', $question->question_id)
+                            ->whereNotNull('selected_option') // Add this condition
                             ->isNotEmpty();
                     })->count();
 
@@ -130,10 +132,11 @@ class PerformanceAnalysisService
                     return [
                         'subject_id' => $questions->first()->question->subject_id,
                         'subject_name' => $questions->first()->question->subject->name,
-                        'score' => round($score), // Round to whole number
+                        'score' => round($score),
                         'correct_answers' => $correctSubjectAnswers,
                         'attempted_questions' => $attemptedSubjectQuestions,
                         'skipped_questions' => $skippedSubjectQuestions,
+                        'total_questions' => $totalSubjectQuestions
                     ];
                 })->values();
 
@@ -146,7 +149,7 @@ class PerformanceAnalysisService
                 'mock_exam_id' => $mockExam->id,
                 'start_time' => $mockExam->start_time,
                 'end_time' => $mockExam->end_time,
-                'total_score' => round($totalScore), // Round to whole number
+                'total_score' => round($totalScore),
                 'total_time_spent' => $totalTimeSpent,
                 'subject_scores' => $subjectScores,
                 'topic_breakdown' => $topicBreakdown,
