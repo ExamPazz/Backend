@@ -512,28 +512,36 @@ private function convertGoogleDriveToDirectLink(string $url): ?string
     return null;
 }
 
-/**
- * Upload image from Google Drive to Cloudinary and return the new URL.
- */
 private function migrateToCloudinary(string $googleDriveUrl): string
 {
     try {
         $directLink = $this->convertGoogleDriveToDirectLink($googleDriveUrl);
 
         if (!$directLink) {
-            return $googleDriveUrl; // If direct link conversion fails, skip
+            throw new \Exception("Failed to convert Google Drive URL.");
         }
 
-        $uploaded = Cloudinary::upload($directLink, [
+        // Download the image to a temporary file
+        $tempFile = tempnam(sys_get_temp_dir(), 'img_');
+        file_put_contents($tempFile, file_get_contents($directLink));
+
+        // Upload to Cloudinary using the local file path
+        $uploaded = Cloudinary::upload($tempFile, [
             'folder' => 'exampazz',
         ]);
 
+        // Delete the temp file after upload
+        unlink($tempFile);
+
         return $uploaded->getSecurePath();
+
     } catch (\Exception $e) {
-        report($e); // Log error for debugging
-        return $googleDriveUrl; // Fallback to original URL if migration fails
+        report($e); // Log the error
+        return $googleDriveUrl; // Fallback to the original URL if migration fails
     }
 }
+
+
 
 
 }
