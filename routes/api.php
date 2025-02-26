@@ -62,7 +62,9 @@ Route::group(
         Route::post('password/reset/code/resend', [ResetPasswordController::class, 'resendOtp']);
         Route::post('code/send/whatsapp', [OTPController::class, 'sendViaWhatsApp']);
         Route::post('/user/restore', [UserProfileController::class, 'restore']);
-        Route::post('/convert-images', [CsvImportController::class, 'convertImages']);
+        Route::post('/convert-images', [CsvImportController::class, 'migrateImagesToCloudinaryBySubject']);
+
+        Route::post('/test', [CsvImportController::class, 'test']);
 
 
         Route::middleware(['web'])->group(function () {
@@ -118,6 +120,8 @@ Route::group(
         Route::post('keys/import/lit-eng', [ImportKeyController::class, 'importStructureForLiteng']);
         Route::post('keys/import/maths', [ImportKeyController::class, 'importStructureForMaths']);
         Route::post('keys/import/acc', [ImportKeyController::class, 'importStructureForAcc']);
+        Route::post('keys/import/phy', [ImportKeyController::class, 'importStructureForPhy']);
+        Route::post('images', [CsvImportController::class, 'imageS3']);
 
 
 
