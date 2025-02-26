@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\MockExam;
 use App\Models\UserExamAnswer;
 use App\Models\WeakArea;
+use Carbon\Carbon;
 
 
 class PerformanceAnalysisService
@@ -101,7 +102,24 @@ class PerformanceAnalysisService
             ->get();
 
         $result = $mockExams->map(function ($mockExam) {
-            $totalTimeSpent = $mockExam->completed_at->diffInMinutes($mockExam->start_time);
+            // Fix: Convert timestamps to Carbon instances if they're not already
+            $startTime = $mockExam->start_time instanceof Carbon
+                ? $mockExam->start_time
+                : Carbon::parse($mockExam->start_time);
+
+            $completedAt = $mockExam->completed_at instanceof Carbon
+                ? $mockExam->completed_at
+                : Carbon::parse($mockExam->completed_at);
+
+            // Calculate time spent using Carbon instances
+            $totalTimeSpent = $startTime->diffInMinutes($completedAt);
+
+            $userAnswers = UserExamAnswer::where('mock_exam_id', $mockExam->id)
+                ->where('user_id', $user->id)
+                ->get();
+
+            $mockExamQuestionsCount = $mockExam->mockExamQuestions->count();
+            $correctAnswers = $userAnswers->where('is_correct', true)->count();
 
             // Calculate scores by subject (100 points each)
             $subjectScores = $mockExam->mockExamQuestions
@@ -147,7 +165,7 @@ class PerformanceAnalysisService
 
             return [
                 'mock_exam_id' => $mockExam->id,
-                'start_time' => $mockExam->start_time,
+                'start_time' => $startTime,
                 'end_time' => $mockExam->end_time,
                 'total_score' => round($totalScore),
                 'total_time_spent' => $totalTimeSpent,
