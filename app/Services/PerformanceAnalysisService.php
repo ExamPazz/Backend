@@ -6,6 +6,7 @@ use App\Models\MockExam;
 use App\Models\UserExamAnswer;
 use App\Models\WeakArea;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 
 class PerformanceAnalysisService
@@ -96,85 +97,87 @@ class PerformanceAnalysisService
 
     public function getUserMockExamsWithScores($user)
     {
-        $mockExams = MockExam::with(['mockExamQuestions.question.subject', 'mockExamQuestions.question.topic', 'userAnswers'])
-            ->where('user_id', $user->id)
-            ->latest()
-            ->get();
-
-        $result = $mockExams->map(function ($mockExam) {
-            // Fix: Convert timestamps to Carbon instances if they're not already
-            $startTime = $mockExam->start_time instanceof Carbon
-                ? $mockExam->start_time
-                : Carbon::parse($mockExam->start_time);
-
-            $completedAt = $mockExam->completed_at instanceof Carbon
-                ? $mockExam->completed_at
-                : Carbon::parse($mockExam->completed_at);
-
-            // Calculate time spent using Carbon instances
-            $totalTimeSpent = $startTime->diffInMinutes($completedAt);
-
-            $userAnswers = UserExamAnswer::where('mock_exam_id', $mockExam->id)
+        try {
+            $mockExams = MockExam::with(['mockExamQuestions.question.subject', 'mockExamQuestions.question.topic', 'userAnswers'])
                 ->where('user_id', $user->id)
+                ->latest()
                 ->get();
 
-            $mockExamQuestionsCount = $mockExam->mockExamQuestions->count();
-            $correctAnswers = $userAnswers->where('is_correct', true)->count();
+            if ($mockExams->isEmpty()) {
+                return collect();
+            }
 
-            // Calculate scores by subject (100 points each)
-            $subjectScores = $mockExam->mockExamQuestions
-                ->groupBy('question.subject_id')
-                ->map(function ($questions) use ($mockExam) {
-                    $totalSubjectQuestions = $questions->count();
-                    $correctSubjectAnswers = $questions->filter(function ($question) use ($mockExam) {
-                        return $mockExam->userAnswers
-                            ->where('question_id', $question->question_id)
-                            ->where('is_correct', true)
-                            ->isNotEmpty();
-                    })->count();
+            $result = $mockExams->map(function ($mockExam) use ($user) {
+                // Fix: Convert timestamps to Carbon instances if they're not already
+                $startTime = $mockExam->start_time instanceof Carbon
+                    ? $mockExam->start_time
+                    : Carbon::parse($mockExam->start_time);
 
-                    // Update: Only count questions with non-null selected_option as attempted
-                    $attemptedSubjectQuestions = $questions->filter(function ($question) use ($mockExam) {
-                        return $mockExam->userAnswers
-                            ->where('question_id', $question->question_id)
-                            ->whereNotNull('selected_option') // Add this condition
-                            ->isNotEmpty();
-                    })->count();
+                $completedAt = $mockExam->completed_at instanceof Carbon
+                    ? $mockExam->completed_at
+                    : Carbon::parse($mockExam->completed_at);
 
-                    $skippedSubjectQuestions = $totalSubjectQuestions - $attemptedSubjectQuestions;
+                // Calculate time spent using Carbon instances
+                $totalTimeSpent = $startTime->diffInMinutes($completedAt);
 
-                    // Calculate score out of 100 for this subject
-                    $scorePerQuestion = 100 / $totalSubjectQuestions;
-                    $score = $correctSubjectAnswers * $scorePerQuestion;
+                // Calculate scores by subject (100 points each)
+                $subjectScores = $mockExam->mockExamQuestions
+                    ->groupBy('question.subject_id')
+                    ->map(function ($questions) use ($mockExam) {
+                        $totalSubjectQuestions = $questions->count();
+                        $correctSubjectAnswers = $questions->filter(function ($question) use ($mockExam) {
+                            return $mockExam->userAnswers
+                                ->where('question_id', $question->question_id)
+                                ->where('is_correct', true)
+                                ->isNotEmpty();
+                        })->count();
 
-                    return [
-                        'subject_id' => $questions->first()->question->subject_id,
-                        'subject_name' => $questions->first()->question->subject->name,
-                        'score' => round($score),
-                        'correct_answers' => $correctSubjectAnswers,
-                        'attempted_questions' => $attemptedSubjectQuestions,
-                        'skipped_questions' => $skippedSubjectQuestions,
-                        'total_questions' => $totalSubjectQuestions
-                    ];
-                })->values();
+                        // Update: Only count questions with non-null selected_option as attempted
+                        $attemptedSubjectQuestions = $questions->filter(function ($question) use ($mockExam) {
+                            return $mockExam->userAnswers
+                                ->where('question_id', $question->question_id)
+                                ->whereNotNull('selected_option')
+                                ->isNotEmpty();
+                        })->count();
 
-            // Total score is sum of all subject scores (out of 400)
-            $totalScore = $subjectScores->sum('score');
+                        $skippedSubjectQuestions = $totalSubjectQuestions - $attemptedSubjectQuestions;
 
-            $topicBreakdown = $this->getMockExamTopicBreakdown($mockExam);
+                        // Calculate score out of 100 for this subject
+                        $scorePerQuestion = 100 / $totalSubjectQuestions;
+                        $score = $correctSubjectAnswers * $scorePerQuestion;
 
-            return [
-                'mock_exam_id' => $mockExam->id,
-                'start_time' => $startTime,
-                'end_time' => $mockExam->end_time,
-                'total_score' => round($totalScore),
-                'total_time_spent' => $totalTimeSpent,
-                'subject_scores' => $subjectScores,
-                'topic_breakdown' => $topicBreakdown,
-            ];
-        });
+                        return [
+                            'subject_id' => $questions->first()->question->subject_id,
+                            'subject_name' => $questions->first()->question->subject->name,
+                            'score' => round($score),
+                            'correct_answers' => $correctSubjectAnswers,
+                            'attempted_questions' => $attemptedSubjectQuestions,
+                            'skipped_questions' => $skippedSubjectQuestions,
+                            'total_questions' => $totalSubjectQuestions
+                        ];
+                    })->values();
 
-        return $result;
+                // Total score is sum of all subject scores (out of 400)
+                $totalScore = $subjectScores->sum('score');
+
+                $topicBreakdown = $this->getMockExamTopicBreakdown($mockExam);
+
+                return [
+                    'mock_exam_id' => $mockExam->id,
+                    'start_time' => $startTime,
+                    'end_time' => $mockExam->end_time,
+                    'total_score' => round($totalScore),
+                    'total_time_spent' => $totalTimeSpent,
+                    'subject_scores' => $subjectScores,
+                    'topic_breakdown' => $topicBreakdown,
+                ];
+            });
+
+            return $result;
+        } catch (\Exception $e) {
+            Log::error('Error in getUserMockExamsWithScores: ' . $e->getMessage());
+            return collect();
+        }
     }
 
     public function getUserMockExamCount($user)
@@ -378,5 +381,6 @@ class PerformanceAnalysisService
             })
             ->values(); // Ensure it's returned as an indexed array
 
-        return $weakAreas;}
+        return $weakAreas;
+    }
 }
