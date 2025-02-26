@@ -556,9 +556,11 @@ private function migrateToCloudinary(string $googleDriveUrl): string
         Log::info("Uploading to Cloudinary: {$tempFile}");
 
         // Upload using 'file://' to ensure Cloudinary treats it as a local file
-        $uploaded = Cloudinary::upload(fopen($tempFile, 'r'), [
+        $uploaded = Cloudinary::upload($tempFile, [
             'folder' => 'exampazz',
-        ]);
+        ]);        
+        
+        // dd($uploaded);
         
         if (!$uploaded->getSecurePath()) {
             throw new \Exception("Cloudinary upload failed or returned no URL.");
@@ -570,12 +572,12 @@ private function migrateToCloudinary(string $googleDriveUrl): string
             throw new \Exception("Cloudinary upload failed or returned no URL.");
         }
 
-        \Log::info("Uploaded to Cloudinary URL: " . $uploaded->getSecurePath());
+        Log::info("Uploaded to Cloudinary URL: " . $uploaded->getSecurePath());
 
         return $uploaded->getSecurePath();
 
     } catch (\Exception $e) {
-        \Log::error("Migration error: " . $e->getMessage());
+        Log::error("Migration error: " . $e->getMessage());
         return $googleDriveUrl; // Return original URL on failure
     }
 }
@@ -583,9 +585,8 @@ private function migrateToCloudinary(string $googleDriveUrl): string
 public function test()
 {
     $url = "https://drive.google.com/file/d/1fkX1gXafTC8fMVYY7U_FDpUsqiYTbiwx/view?usp=drive_link";
-$newUrl = $this->migrateToCloudinary($url);
-
-dd($newUrl); 
+    $newUrl = $this->migrateToCloudinary($url);
+    dd($newUrl); 
 }
 
 }
