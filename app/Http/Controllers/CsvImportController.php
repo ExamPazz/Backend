@@ -444,54 +444,95 @@ class CsvImportController extends Controller
     }
 
     public function migrateImagesToCloudinaryBySubject(Request $request)
-{
-    $request->validate([
-        'subject_id' => 'required|integer|exists:subjects,id',
-    ]);
-
-    $subjectId = $request->input('subject_id');
-    $chunkSize = 100; // Process questions in manageable chunks
-
-    DB::transaction(function () use ($chunkSize, $subjectId) {
-        // Migrate images from the questions table
-        Question::where('subject_id', $subjectId)
-            ->where(function ($query) {
-                $query->whereNotNull('image_url')->orWhereNotNull('solution');
-            })
-            ->chunkById($chunkSize, function ($questions) {
-                foreach ($questions as $question) {
-                    $updatedFields = [];
-
-                    if ($question->image_url && $this->isGoogleDriveUrl($question->image_url)) {
-                        $updatedFields['image_url'] = $this->migrateToCloudinary($question->image_url);
+    {
+        $request->validate([
+            'subject_id' => 'required|integer|exists:subjects,id',
+        ]);
+    
+        $subjectId = $request->input('subject_id');
+        $chunkSize = 50; // Reduce chunk size to prevent timeouts
+        $processed = 0;
+        $skipped = 0;
+        $failed = 0;
+    
+        DB::transaction(function () use ($subjectId, $chunkSize, &$processed, &$skipped, &$failed) {
+    
+            // Migrate images from 'questions' table
+            Question::where('subject_id', $subjectId)
+                ->where(function ($query) {
+                    $query->whereNotNull('image')->orWhereNotNull('solution');
+                })
+                ->chunkById($chunkSize, function ($questions) use (&$processed, &$skipped, &$failed) {
+                    foreach ($questions as $question) {
+                        $updatedFields = [];
+    
+                        if ($question->image && !$this->isCloudinaryUrl($question->image)) {
+                            $newUrl = $this->migrateToCloudinary($question->image);
+                            if ($newUrl) {
+                                $updatedFields['image'] = $newUrl;
+                                $processed++;
+                            } else {
+                                $failed++;
+                            }
+                        } else {
+                            $skipped++;
+                        }
+    
+                        if ($question->solution && !$this->isCloudinaryUrl($question->solution)) {
+                            $newUrl = $this->migrateToCloudinary($question->solution);
+                            if ($newUrl) {
+                                $updatedFields['solution'] = $newUrl;
+                                $processed++;
+                            } else {
+                                $failed++;
+                            }
+                        } else {
+                            $skipped++;
+                        }
+    
+                        if (!empty($updatedFields)) {
+                            $question->update($updatedFields); // Save immediately
+                        }
                     }
-
-                    if ($question->solution && $this->isGoogleDriveUrl($question->solution)) {
-                        $updatedFields['solution'] = $this->migrateToCloudinary($question->solution);
+                });
+    
+            // Migrate images from 'question_options' table
+            QuestionOption::whereHas('question', fn($q) => $q->where('subject_id', $subjectId))
+                ->whereNotNull('value')
+                ->chunkById($chunkSize, function ($options) use (&$processed, &$skipped, &$failed) {
+                    foreach ($options as $option) {
+                        if (!$this->isCloudinaryUrl($option->value)) {
+                            $newUrl = $this->migrateToCloudinary($option->value);
+                            if ($newUrl) {
+                                $option->update(['value' => $newUrl]);
+                                $processed++;
+                            } else {
+                                $failed++;
+                            }
+                        } else {
+                            $skipped++;
+                        }
                     }
-
-                    if (!empty($updatedFields)) {
-                        $question->update($updatedFields);
-                    }
-                }
-            });
-
-        // Migrate images from the question_options table
-        QuestionOption::whereHas('question', function ($query) use ($subjectId) {
-            $query->where('subject_id', $subjectId);
-        })->whereNotNull('value')
-          ->chunkById($chunkSize, function ($options) {
-              foreach ($options as $option) {
-                  if ($this->isGoogleDriveUrl($option->value)) {
-                      $option->update(['value' => $this->migrateToCloudinary($option->value)]);
-                  }
-              }
-          });
-    });
-
-    return response()->json(['message' => 'Image migration to Cloudinary for the selected subject completed successfully.']);
-}
-
+                });
+        });
+    
+        return response()->json([
+            'message' => 'Migration completed for this run.',
+            'processed' => $processed,
+            'skipped (already migrated)' => $skipped,
+            'failed' => $failed,
+            'note' => 'You can rerun this endpoint to continue migrating remaining images.',
+        ]);
+    }
+    
+    /**
+     * Check if the URL is already a Cloudinary URL.
+     */
+    private function isCloudinaryUrl(string $url): bool
+    {
+        return str_contains($url, 'res.cloudinary.com');
+    }
+    
 /**
  * Check if the URL is a Google Drive link.
  */
