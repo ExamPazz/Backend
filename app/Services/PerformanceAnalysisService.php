@@ -101,7 +101,7 @@ class PerformanceAnalysisService
             ->get();
 
         $result = $mockExams->map(function ($mockExam) {
-            $totalTimeSpent = $mockExam->end_time->diffInMinutes($mockExam->start_time);
+            $totalTimeSpent = $mockExam->completed_at->diffInMinutes($mockExam->start_time);
 
             // Calculate scores by subject (100 points each)
             $subjectScores = $mockExam->mockExamQuestions
