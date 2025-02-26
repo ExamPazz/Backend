@@ -455,14 +455,14 @@ class CsvImportController extends Controller
             // Migrate images from the questions table for the specified subject
             Question::where('subject_id', $subjectId)
                 ->where(function ($query) {
-                    $query->whereNotNull('image')->orWhereNotNull('solution');
+                    $query->whereNotNull('image_url')->orWhereNotNull('solution');
                 })
                 ->chunkById($chunkSize, function ($questions) {
                     foreach ($questions as $question) {
                         $updatedFields = [];
 
-                        if ($question->image && $this->isS3Url($question->image)) {
-                            $updatedFields['image'] = $this->migrateToCloudinary($question->image);
+                        if ($question->image && $this->isS3Url($question->image_url)) {
+                            $updatedFields['image_url'] = $this->migrateToCloudinary($question->image_url);
                         }
 
                         if ($question->solution && $this->isS3Url($question->solution)) {
