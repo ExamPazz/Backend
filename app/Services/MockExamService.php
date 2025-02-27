@@ -254,6 +254,7 @@ class MockExamService
 
             $answersToInsert = [];
             $now = now();
+            $totalAnswered = 0; // Track actually answered questions
 
             // Process and store new answers
             foreach ($request->answers as $answer) {
@@ -262,6 +263,22 @@ class MockExamService
                     ->first()
                     ->question;
 
+                // Handle skipped questions (null or empty selected_option)
+                if (empty($answer['selected_option'])) {
+                    $answersToInsert[] = [
+                        'mock_exam_id' => $request->mock_exam_id,
+                        'user_id' => $user->id,
+                        'question_id' => $answer['question_id'],
+                        'selected_option' => null,
+                        'is_correct' => false,
+                        'time_spent' => $answer['time_spent'] ?? 0,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                    continue;
+                }
+
+                // Process answered questions
                 $selectedOption = $question->questionOptions
                     ->where('id', $answer['selected_option'])
                     ->first();
@@ -270,12 +287,14 @@ class MockExamService
                     'mock_exam_id' => $request->mock_exam_id,
                     'user_id' => $user->id,
                     'question_id' => $answer['question_id'],
-                    'selected_option' => $answer['selected_option'] ?? null,
+                    'selected_option' => $answer['selected_option'],
                     'is_correct' => $selectedOption ? $selectedOption->is_correct : false,
                     'time_spent' => $answer['time_spent'] ?? 0,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ];
+
+                $totalAnswered++; // Increment only for actually answered questions
             }
 
             // Insert all answers
@@ -303,16 +322,15 @@ class MockExamService
 
             // Calculate other metrics
             $totalQuestions = $mockExam->mockExamQuestions->count();
-            $totalAnswered = count($request->answers);
             $totalCorrect = $mockExam->userAnswers->where('is_correct', true)->count();
-            $totalWrong = $totalAnswered - $totalCorrect;
-            $totalTimeSpent = $mockExam->start_time->diffInSeconds(now());
+            $totalWrong = $totalAnswered - $totalCorrect; // Only count wrong from attempted questions
+
             // Update mock exam with scores
             $mockExam->update([
                 'score' => round($totalScore),
                 'completed_at' => $now,
                 'total_questions' => $totalQuestions,
-                'total_answered' => $totalAnswered,
+                'total_answered' => $totalAnswered, // Use the count of actually answered questions
                 'total_correct' => $totalCorrect,
                 'total_wrong' => $totalWrong
             ]);
@@ -336,11 +354,11 @@ class MockExamService
                 'success' => true,
                 'total_score' => round($totalScore),
                 'total_questions' => $totalQuestions,
-                'total_answered' => $totalAnswered,
+                'total_answered' => $totalAnswered, // Actually attempted questions
                 'total_correct' => $totalCorrect,
                 'total_wrong' => $totalWrong,
-                'total_time_spent' => $totalTimeSpent
-
+                'skipped' => $totalQuestions - $totalAnswered, // Add skipped questions count
+                'total_time_spent' => $mockExam->userAnswers->sum('time_spent')
             ];
 
         } catch (\Exception $e) {
