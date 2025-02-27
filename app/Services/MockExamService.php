@@ -157,6 +157,7 @@ class MockExamService
                     'objective:id,body'
                 ])
                 ->whereIn('id', $questionIds[$subjectId])
+                ->whereNotNull('topic_id') // Ensure topic is not null
                 ->has('questionOptions', '>=', 4) // Ensure minimum of 4 valid options
                 ->get();
                 //Structure response
