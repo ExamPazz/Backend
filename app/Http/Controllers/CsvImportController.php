@@ -444,75 +444,77 @@ class CsvImportController extends Controller
     }
 
     public function migrateImagesToCloudinaryBySubject(Request $request)
-{
-    $request->validate([
-        'subject_id' => 'required|integer|exists:subjects,id',
-    ]);
+    {
+        $request->validate([
+            'subject_id' => 'required|integer|exists:subjects,id',
+        ]);
 
-    $subjectId = $request->input('subject_id');
-    $chunkSize = 10; // Reduce chunk size to avoid timeouts
-    $processed = 0;
-    $skipped = 0;
-    $failed = 0;
+        $subjectId = $request->input('subject_id');
+        $chunkSize = 10; // Reduce chunk size to avoid timeouts
+        $processed = 0;
+        $skipped = 0;
+        $failed = 0;
 
-    // Migrate images from 'questions' table
-    Question::where('subject_id', $subjectId)
-        ->where(function ($query) {
-            $query->whereNotNull('image_url')->orWhereNotNull('solution');
-        })
-        ->chunkById($chunkSize, function ($questions) use (&$processed, &$skipped, &$failed) {
-            foreach ($questions as $question) {
-                $updatedFields = [];
+        // Migrate images from 'questions' table
+        Question::where('subject_id', $subjectId)
+            ->where(function ($query) {
+                $query->whereNotNull('image_url')->orWhereNotNull('solution');
+            })
+            ->chunkById($chunkSize, function ($questions) use (&$processed, &$skipped, &$failed) {
+                foreach ($questions as $question) {
+                    $updatedFields = [];
+                    $originalUrls = [];
 
-                if ($question->image_url && !$this->isCloudinaryUrl($question->image_url)) {
-                    $newUrl = $this->migrateToCloudinary($question->image_url);
-                    if ($newUrl) {
-                        $updatedFields['image_url'] = $newUrl;
-                        $processed++;
-                    } else {
-                        $failed++;
-                    }
-                } else {
-                    $skipped++;
-                }
-
-                if ($question->solution && !$this->isCloudinaryUrl($question->solution)) {
-                    $newUrl = $this->migrateToCloudinary($question->solution);
-                    if ($newUrl) {
-                        $updatedFields['solution'] = $newUrl;
-                        $processed++;
-                    } else {
-                        $failed++;
-                    }
-                } else {
-                    $skipped++;
-                }
-
-                if (!empty($updatedFields)) {
-                    // Retry update if locked
-                    for ($attempt = 0; $attempt < 3; $attempt++) {
-                        try {
-                            $question->update($updatedFields);
-                            break;
-                        } catch (\Illuminate\Database\QueryException $e) {
-                            if ($attempt == 2) throw $e;
-                            sleep(1);
+                    if ($question->image_url && !$this->isCloudinaryUrl($question->image_url)) {
+                        $newUrl = $this->migrateToCloudinary($question->image_url);
+                        if ($newUrl && $newUrl !== $question->image_url) {
+                            $updatedFields['image_url'] = $newUrl;
+                            $originalUrls['image_url'] = $question->image_url;
                         }
                     }
+
+                    if ($question->solution && !$this->isCloudinaryUrl($question->solution)) {
+                        $newUrl = $this->migrateToCloudinary($question->solution);
+                        if ($newUrl && $newUrl !== $question->solution) {
+                            $updatedFields['solution'] = $newUrl;
+                            $originalUrls['solution'] = $question->solution;
+                        }
+                    }
+
+                    if (!empty($updatedFields)) {
+                        // Retry update if locked
+                        for ($attempt = 0; $attempt < 3; $attempt++) {
+                            try {
+                                $question->update($updatedFields);
+                                $processed++;
+                                Log::info("Updated question ID {$question->id}: ", [
+                                    'original' => $originalUrls,
+                                    'updated' => $updatedFields
+                                ]);
+                                break;
+                            } catch (\Illuminate\Database\QueryException $e) {
+                                if ($attempt == 2) {
+                                    Log::error("Failed to update question ID {$question->id}: " . $e->getMessage());
+                                    $failed++;
+                                }
+                                sleep(1);
+                            }
+                        }
+                    } else {
+                        $skipped++;
+                    }
                 }
-            }
-        });
+            });
 
-    return response()->json([
-        'message' => 'Migration completed for this run.',
-        'processed' => $processed,
-        'skipped (already migrated)' => $skipped,
-        'failed' => $failed,
-        'note' => 'You can rerun this endpoint to continue migrating remaining images.',
-    ]);
-}
+        return response()->json([
+            'message' => 'Migration completed for this run.',
+            'processed' => $processed,
+            'skipped (already migrated or unchanged)' => $skipped,
+            'failed' => $failed,
+            'note' => 'You can rerun this endpoint to continue migrating remaining images.',
+        ]);
+    }
 
-    
     /**
      * Check if the URL is already a Cloudinary URL.
      */
