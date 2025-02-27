@@ -165,7 +165,7 @@ class PerformanceAnalysisService
                 return [
                     'mock_exam_id' => $mockExam->id,
                     'start_time' => $startTime,
-                    'end_time' => $mockExam->end_time,
+                    'end_time' => Carbon::parse($mockExam->completed_at),
                     'total_score' => round($totalScore),
                     'total_time_spent' => $totalTimeSpent,
                     'subject_scores' => $subjectScores,
