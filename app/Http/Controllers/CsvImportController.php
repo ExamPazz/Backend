@@ -18,6 +18,10 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\LazyCollection;
 use Illuminate\Support\Str;
+use Intervention\Image\Facades\Image;
+use GuzzleHttp\Client;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
+
 
 class CsvImportController extends Controller
 {
@@ -329,103 +333,98 @@ class CsvImportController extends Controller
         $request->validate([
             'subject_id' => ['required', 'exists:subjects,id'],
         ]);
-
+    
         $subjectId = $request->input('subject_id');
-
+    
         try {
             $convertedCount = 0;
             $failedConversions = [];
-
-            // 🔄 Process questions in chunks (image_url & solution)
+    
+            // 🔄 Process questions (image_url & solution)
             Question::where('subject_id', $subjectId)
                 ->where(function ($query) {
-                    $query->where('image_url', 'like', '%drive.google.com%')
-                        ->orWhere('solution', 'like', '%drive.google.com%');
+                    $query->where('image_url', 'like', '%exampazz-img.s3.%png%')
+                          ->orWhere('solution', 'like', '%exampazz-img.s3.%png%');
                 })
                 ->chunk(100, function ($questions) use (&$convertedCount, &$failedConversions) {
                     foreach ($questions as $question) {
                         $updatedFields = [];
-
-                        // 🖼️ Convert image_url if still Google Drive URL
-                        if ($question->image_url && str_contains($question->image_url, 'drive.google.com')) {
-                            $convertedUrl = $this->convertAndStoreImage($question->image_url);
-                            if ($convertedUrl) {
-                                $updatedFields['image_url'] = $convertedUrl;
+    
+                        if ($question->image_url && str_contains($question->image_url, '.png')) {
+                            $jpegUrl = $this->convertAndUploadToNewBucket($question->image_url);
+                            if ($jpegUrl) {
+                                $updatedFields['image_url'] = $jpegUrl;
                                 $convertedCount++;
                             } else {
                                 $failedConversions[] = ['type' => 'question_image', 'id' => $question->id];
                             }
                         }
-
-                        // 📝 Convert solution if still Google Drive URL
-                        if ($question->solution && str_contains($question->solution, 'drive.google.com')) {
-                            $convertedSolutionUrl = $this->convertAndStoreImage($question->solution);
-                            if ($convertedSolutionUrl) {
-                                $updatedFields['solution'] = $convertedSolutionUrl;
+    
+                        if ($question->solution && str_contains($question->solution, '.png')) {
+                            $jpegUrl = $this->convertAndUploadToNewBucket($question->solution);
+                            if ($jpegUrl) {
+                                $updatedFields['solution'] = $jpegUrl;
                                 $convertedCount++;
                             } else {
                                 $failedConversions[] = ['type' => 'question_solution', 'id' => $question->id];
                             }
                         }
-
+    
                         if (!empty($updatedFields)) {
                             $question->update($updatedFields);
                         }
                     }
                 });
-
-            // 🔄 Process options in chunks
+    
+            // 🔄 Process options
             QuestionOption::whereHas('question', function ($query) use ($subjectId) {
                     $query->where('subject_id', $subjectId);
                 })
-                ->where('value', 'like', '%drive.google.com%')
+                ->where('value', 'like', '%exampazz-img.s3.%png%')
                 ->chunk(100, function ($options) use (&$convertedCount, &$failedConversions) {
                     foreach ($options as $option) {
-                        $convertedUrl = $this->convertAndStoreImage($option->value);
-                        if ($convertedUrl) {
-                            $option->update(['value' => $convertedUrl]);
+                        $jpegUrl = $this->convertAndUploadToNewBucket($option->value);
+                        if ($jpegUrl) {
+                            $option->update(['value' => $jpegUrl]);
                             $convertedCount++;
                         } else {
                             $failedConversions[] = ['type' => 'option', 'id' => $option->id];
                         }
                     }
                 });
-
+    
             return response()->json([
-                'message' => 'Image conversion completed.',
+                'message' => 'PNG to JPEG conversion completed.',
                 'converted_images' => $convertedCount,
                 'failed_conversions' => $failedConversions,
             ]);
-
+    
         } catch (\Exception $e) {
             return response()->json([
-                'error' => 'Image conversion failed: ' . $e->getMessage(),
+                'error' => 'Conversion failed: ' . $e->getMessage(),
             ], 500);
         }
     }
 
-    private function convertAndStoreImage($url)
+    private function convertAndUploadToNewBucket($url)
     {
-        $directUrl = $this->convertGoogleDriveUrl($url);
-
-        if (!$directUrl) {
-            return null;
-        }
-
         try {
-            $response = Http::withoutVerifying()->get($directUrl);
+            $response = Http::withoutVerifying()->get($url);
 
             if ($response->successful()) {
-                $fileName = 'images/' . uniqid() . '.png';
-                
-                // Store the image in S3
-                Storage::disk('s3')->put($fileName, $response->body(), 'public');
+                // 🖼️ Convert PNG to JPEG
+                $image = Image::make($response->body())->encode('jpeg', 85); // Adjust quality if needed
+                $fileName = 'images/' . uniqid() . '.jpeg';
 
-                // Return the public URL
+                // ✅ Upload to the new S3 bucket
+                Storage::disk('s3')->put($fileName, (string) $image, [
+                    'visibility' => 'public',
+                ]);
+
                 return Storage::disk('s3')->url($fileName);
             }
         } catch (\Exception $e) {
-            Log::error("Failed to convert image: {$e->getMessage()}");
+            Log::error("Failed to convert and upload image: {$e->getMessage()}");
         }
 
         return null;
@@ -443,5 +442,192 @@ class CsvImportController extends Controller
 
         return null;
     }
+
+    public function migrateImagesToCloudinaryBySubject(Request $request)
+    {
+        $request->validate([
+            'subject_id' => 'required|integer|exists:subjects,id',
+        ]);
+    
+        $subjectId = $request->input('subject_id');
+        $chunkSize = 50; // Reduce chunk size to prevent timeouts
+        $processed = 0;
+        $skipped = 0;
+        $failed = 0;
+    
+        DB::transaction(function () use ($subjectId, $chunkSize, &$processed, &$skipped, &$failed) {
+    
+            // Migrate images from 'questions' table
+            Question::where('subject_id', $subjectId)
+                ->where(function ($query) {
+                    $query->whereNotNull('image_url')->orWhereNotNull('solution');
+                })
+                ->chunkById($chunkSize, function ($questions) use (&$processed, &$skipped, &$failed) {
+                    foreach ($questions as $question) {
+                        $updatedFields = [];
+    
+                        if ($question->image_url && !$this->isCloudinaryUrl($question->image_url)) {
+                            $newUrl = $this->migrateToCloudinary($question->image_url);
+                            if ($newUrl) {
+                                $updatedFields['image_url'] = $newUrl;
+                                $processed++;
+                            } else {
+                                $failed++;
+                            }
+                        } else {
+                            $skipped++;
+                        }
+    
+                        if ($question->solution && !$this->isCloudinaryUrl($question->solution)) {
+                            $newUrl = $this->migrateToCloudinary($question->solution);
+                            if ($newUrl) {
+                                $updatedFields['solution'] = $newUrl;
+                                $processed++;
+                            } else {
+                                $failed++;
+                            }
+                        } else {
+                            $skipped++;
+                        }
+    
+                        if (!empty($updatedFields)) {
+                            $question->update($updatedFields); // Save immediately
+                        }
+                    }
+                });
+    
+            // Migrate images from 'question_options' table
+            QuestionOption::whereHas('question', fn($q) => $q->where('subject_id', $subjectId))
+                ->whereNotNull('value')
+                ->chunkById($chunkSize, function ($options) use (&$processed, &$skipped, &$failed) {
+                    foreach ($options as $option) {
+                        if (!$this->isCloudinaryUrl($option->value)) {
+                            $newUrl = $this->migrateToCloudinary($option->value);
+                            if ($newUrl) {
+                                $option->update(['value' => $newUrl]);
+                                $processed++;
+                            } else {
+                                $failed++;
+                            }
+                        } else {
+                            $skipped++;
+                        }
+                    }
+                });
+        });
+    
+        return response()->json([
+            'message' => 'Migration completed for this run.',
+            'processed' => $processed,
+            'skipped (already migrated)' => $skipped,
+            'failed' => $failed,
+            'note' => 'You can rerun this endpoint to continue migrating remaining images.',
+        ]);
+    }
+    
+    /**
+     * Check if the URL is already a Cloudinary URL.
+     */
+    private function isCloudinaryUrl(string $url): bool
+    {
+        return str_contains($url, 'res.cloudinary.com');
+    }
+    
+/**
+ * Check if the URL is a Google Drive link.
+ */
+private function isGoogleDriveUrl(string $url): bool
+{
+    return str_contains($url, 'drive.google.com');
+}
+
+/**
+ * Convert Google Drive URL to direct download link.
+ */
+private function convertGoogleDriveToDirectLink(string $url): ?string
+{
+    if (preg_match('/drive\.google\.com\/file\/d\/([^\/]+)/', $url, $matches)) {
+        $fileId = $matches[1];
+        return "https://drive.google.com/uc?export=download&id={$fileId}";
+    }
+
+    return null;
+}
+
+private function migrateToCloudinary(string $googleDriveUrl): string
+{
+    try {
+        $directLink = $this->convertGoogleDriveToDirectLink($googleDriveUrl);
+
+        if (!$directLink) {
+            throw new \Exception("Failed to convert Google Drive URL: {$googleDriveUrl}");
+        }
+
+        Log::info("Converted Google Drive URL: {$directLink}");
+
+        $client = new Client([
+            'timeout' => 30,
+            'headers' => [
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            ],
+        ]);
+
+        $response = $client->get($directLink, ['stream' => true]);
+
+        if ($response->getStatusCode() !== 200) {
+            throw new \Exception("Failed to download image. HTTP Status: {$response->getStatusCode()}");
+        }
+
+        $tempFile = tempnam(sys_get_temp_dir(), 'img_');
+        file_put_contents($tempFile, $response->getBody()->getContents());
+
+        if (filesize($tempFile) === 0) {
+            throw new \Exception("Downloaded file is empty.");
+        }
+
+        // Check if the file is a valid image
+        $mimeType = mime_content_type($tempFile);
+        Log::info("Downloaded file MIME type: {$mimeType}");
+
+        if (!str_starts_with($mimeType, 'image/')) {
+            unlink($tempFile);
+            throw new \Exception("Downloaded file is not an image. MIME type: {$mimeType}");
+        }
+
+        Log::info("Uploading to Cloudinary: {$tempFile}");
+
+        // Upload using 'file://' to ensure Cloudinary treats it as a local file
+        $uploaded = Cloudinary::upload($tempFile, [
+            'folder' => 'exampazz',
+        ]);        
+        
+        // dd($uploaded);
+        
+        if (!$uploaded->getSecurePath()) {
+            throw new \Exception("Cloudinary upload failed or returned no URL.");
+        }
+
+        unlink($tempFile); // Clean up
+
+        if (!$uploaded->getSecurePath()) {
+            throw new \Exception("Cloudinary upload failed or returned no URL.");
+        }
+
+        Log::info("Uploaded to Cloudinary URL: " . $uploaded->getSecurePath());
+
+        return $uploaded->getSecurePath();
+
+    } catch (\Exception $e) {
+        Log::error("Migration error: " . $e->getMessage());
+        return $googleDriveUrl; // Return original URL on failure
+    }
+}
+
+public function test()
+{
+    $url = "https://drive.google.com/file/d/1fkX1gXafTC8fMVYY7U_FDpUsqiYTbiwx/view?usp=drive_link";
+    $newUrl = $this->migrateToCloudinary($url);
+    dd($newUrl); 
+}
 
 }
