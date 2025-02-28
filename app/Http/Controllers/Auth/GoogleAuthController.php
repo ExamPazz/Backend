@@ -83,7 +83,7 @@ class GoogleAuthController extends Controller
      */
     private function handleFreemiumSubscription(mixed $user): void
     {
-        $freemiumPlan = SubscriptionPlan::where(column: 'name', 'freemium')->first();
+        $freemiumPlan = SubscriptionPlan::where('name', 'freemium')->first();
 
         if ($freemiumPlan) {
             Subscription::firstOrCreate(
