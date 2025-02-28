@@ -47,6 +47,10 @@ class LoginRequest extends FormRequest
         $user = User::query()
             ->where('email', $this->email)->first();
 
+        if ($user->google_token) {
+            return ApiResponse::failure('You cannot login with email and password, please use Google', statusCode: 400);
+        }
+
         if (!$user || !Hash::check($this->password, $user->password)) {
             RateLimiter::hit($this->throttleKey());
             return ApiResponse::failure("Credentials do not match our records.");
