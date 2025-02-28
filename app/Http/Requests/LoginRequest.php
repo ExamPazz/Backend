@@ -52,6 +52,11 @@ class LoginRequest extends FormRequest
             return ApiResponse::failure("Credentials do not match our records.");
         }
 
+        // Check if user signed up using Google OAuth
+        if ($user->google_id) {
+            return ApiResponse::failure("You signed up using Google. Please reset your password to log in.");
+        }
+
         if (!$user->is_active)
         {
             return ApiResponse::failure('Account is inactive, please contact Administrator', statusCode: 403);
