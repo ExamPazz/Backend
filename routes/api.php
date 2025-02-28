@@ -76,22 +76,14 @@ Route::group(
             Route::post('auth/callback', function () {
                 Log::info('Google callback route accessed', request()->all());
                 $googleUser = Socialite::driver('google')->stateless()->user();
-                $user = User::where('email', $googleUser->email)->first();
-
-                if ($user) {
-                    // If the user exists, just update Google ID and token (DO NOT overwrite password)
-                    $user->update([
+                $user = User::updateOrCreate(
+                    ['email' => $googleUser->email],
+                    [
                         'google_id' => $googleUser->id,
-                    ]);
-                } else {
-                    // If the user does not exist, create a new one
-                    $user = User::create([
-                        'email' => $googleUser->email,
                         'full_name' => $googleUser->name,
-                        'google_id' => $googleUser->id,
-                        'password' => bcrypt(Str::random(16)), // Only set password for new users
-                    ]);
-                }
+                        'password' => bcrypt(Str::random(16)),
+                    ]
+                );
 
                 $hasExamDetail = $user->latestExamDetail()->exists();
                 $freemiumPlan = SubscriptionPlan::where('name', 'freemium')->first();
