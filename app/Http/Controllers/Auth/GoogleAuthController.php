@@ -49,17 +49,15 @@ class GoogleAuthController extends Controller
                     'email' => $googleUser->email,
                     'google_id' => $googleUser->id,
                     'full_name' => $googleUser->name,
-                    'google_token' => $googleUser->token,
                 ]);
 
                 // Handle freemium subscription
                 $this->handleFreemiumSubscription($user);
             }
 
-            if (!$user->google_token) {
+            if (!$user->google_id) {
                 return ApiResponse::failure('You cannot login with Google, please use email and password', statusCode: 400);
             }
-
 
             // Get user exam details status
             $hasExamDetail = $user->latestExamDetail()->exists();

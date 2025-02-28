@@ -47,7 +47,7 @@ class LoginRequest extends FormRequest
         $user = User::query()
             ->where('email', $this->email)->first();
 
-        if ($user->google_token) {
+        if ($user->google_id) {
             return ApiResponse::failure('You cannot login with email and password, please use Google', statusCode: 400);
         }
 
