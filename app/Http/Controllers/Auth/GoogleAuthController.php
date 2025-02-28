@@ -8,7 +8,7 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use Illuminate\Http\Request;
 use Laravel\Socialite\Facades\Socialite;
-use Illuminate\Support\Str;
+use App\Support\ApiResponse;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\JsonResponse;
 
@@ -42,18 +42,22 @@ class GoogleAuthController extends Controller
                 ->stateless()
                 ->user();
 
-            $user = User::updateOrCreate(
-                ['email' => $googleUser->email],
-                [
+            $user = User::query()->firstWhere('email', $googleUser->email);
+
+            if (!$user) {
+                $user = User::query()->create([
+                    'email' => $googleUser->email,
                     'google_id' => $googleUser->id,
                     'full_name' => $googleUser->name,
-                    'password' => bcrypt(Str::random(16)),
-                    'google_token' => $googleUser->token,
-                ]
-            );
+                ]);
 
-            // Handle freemium subscription
-            $this->handleFreemiumSubscription($user);
+                // Handle freemium subscription
+                $this->handleFreemiumSubscription($user);
+            }
+
+            if (!$user->google_id) {
+                return ApiResponse::failure('You cannot login with Google, please use email and password', statusCode: 400);
+            }
 
             // Get user exam details status
             $hasExamDetail = $user->latestExamDetail()->exists();
@@ -77,9 +81,9 @@ class GoogleAuthController extends Controller
     /**
      * Handle freemium subscription for new users
      */
-    private function handleFreemiumSubscription(User $user): void
+    private function handleFreemiumSubscription(mixed $user): void
     {
-        $freemiumPlan = SubscriptionPlan::where('name', 'freemium')->first();
+        $freemiumPlan = SubscriptionPlan::where(column: 'name', 'freemium')->first();
 
         if ($freemiumPlan) {
             Subscription::firstOrCreate(

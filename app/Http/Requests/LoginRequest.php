@@ -47,8 +47,9 @@ class LoginRequest extends FormRequest
         $user = User::query()
             ->where('email', $this->email)->first();
 
-         if ($user->google_id) {
-            return ApiResponse::failure("You signed up using Google. Please reset your password to log in.");
+
+        if ($user->google_id) {
+            return ApiResponse::failure('You cannot login with email and password, please use Google', statusCode: 400);
         }
 
         if (!$user || !Hash::check($this->password, $user->password)) {
