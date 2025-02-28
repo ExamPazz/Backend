@@ -66,7 +66,7 @@ class SubscriptionService
                     $current_sub = Subscription::query()->latest()->firstWhere('user_id', $metadata['user_id']);
                     if ($current_sub && $current_sub->status == 'active')
                     {
-                       if (is_null($current_sub->subscriptionPlan->allowed_number_of_attempts))
+                       if ($current_sub->subscriptionPlan->name == 'freemium')
                        {
                            $current_sub->update([
                                'status' => 'inactive'
