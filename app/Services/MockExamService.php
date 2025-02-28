@@ -99,9 +99,12 @@ class MockExamService
                                 $query->where('section_id', $latestPercentage->section->id);
                             }
                         })
+                        ->whereHas('topic', function ($query) {
+                            $query->whereNotNull('body')->where('body', '!=', '');
+                        })
                         ->whereHas('questionOptions', function ($query) {
                             $query->whereNotNull('value')->where('value', '!=', '');
-                        }, '>=', 4) // Ensure there are at least 4 valid options
+                        }, '>=', 4)
                         ->inRandomOrder()
                         ->limit($questionsNeeded)
                         ->pluck('id')
@@ -117,13 +120,16 @@ class MockExamService
                         $remainingQuestions = Question::query()
                         ->where('subject_id', $subject_id)
                         ->whereNotIn('id', $selectedQuestionIds)
+                        ->whereHas('topic', function ($query) {
+                            $query->whereNotNull('body')->where('body', '!=', '');
+                        })
                         ->whereHas('questionOptions', function ($query) {
                             $query->whereNotNull('value')->where('value', '!=', '');
                         }, '>=', 4)
                         ->inRandomOrder()
                         ->limit($remainingNeeded)
                         ->pluck('id')
-                        ->toArray();
+                        ->toArray();                    
 
                         $selectedQuestionIds = array_merge($selectedQuestionIds, $remainingQuestions);
                     }
@@ -159,7 +165,7 @@ class MockExamService
                 ->whereIn('id', $questionIds[$subjectId])
                 ->whereNotNull('topic_id') 
                 ->whereHas('topic', function ($query) {
-                    $query->whereNotNull('body')->where('body', '!=', ''); // Ensure topic body is not null or empty
+                    $query->whereNotNull('body')->where('body', '!=', '');
                 })
                 ->has('questionOptions', '>=', 4) // Ensure minimum of 4 valid options
                 ->get();
