@@ -35,7 +35,8 @@ class ContactFormController extends Controller
         } catch (\Exception $e) {
             Log::error('Contact form submission failed', [
                 'error' => $e->getMessage(),
-                'data' => $request->validated()
+                'data' => $request->validated(),
+                'trace' => $e->getTrace()
             ]);
 
             return ApiResponse::failure('Failed to send your message. Please try again later.');
