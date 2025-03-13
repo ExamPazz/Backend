@@ -60,7 +60,7 @@
 
             <div class="field">
                 <div class="label">Message:</div>
-                <div>{!! $message !!}</div>
+                <div>{!! $content !!}</div>
             </div>
         </div>
     </div>

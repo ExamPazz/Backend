@@ -33,7 +33,7 @@ class ContactFormMail extends Mailable implements ShouldQueue
                 'name' => $this->contactForm->name,
                 'email' => $this->contactForm->email,
                 'phone_number' => $this->contactForm->phone_number,
-                'message' => $this->contactForm->message,
+                'content' => $this->contactForm->message,
                 'submitted_at' => $this->contactForm->created_at->format('d M Y H:i:s'),
             ],
         );
