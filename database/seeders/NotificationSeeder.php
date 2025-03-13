@@ -21,6 +21,11 @@ class NotificationSeeder extends Seeder
             'title' => 'Subscription Expired',
             'message' => 'Your {plan_name} subscription has expired. Renew now to continue accessing premium features.'
         ],
+
+        'subcription_success' => [
+            'title' => 'Subscription Successful',
+            'message' => 'Your subscription has been successfully renewed. Thank you for your continued support!'
+        ],
         'new_feature' => [
             'title' => 'New Feature Available',
             'message' => 'We\'ve added {feature_name} to help you prepare better for your exams!'
