@@ -129,7 +129,7 @@ class MockExamService
                         ->inRandomOrder()
                         ->limit($remainingNeeded)
                         ->pluck('id')
-                        ->toArray();                    
+                        ->toArray();
 
                         $selectedQuestionIds = array_merge($selectedQuestionIds, $remainingQuestions);
                     }
@@ -163,7 +163,7 @@ class MockExamService
                     'objective:id,body'
                 ])
                 ->whereIn('id', $questionIds[$subjectId])
-                ->whereNotNull('topic_id') 
+                ->whereNotNull('topic_id')
                 ->whereHas('topic', function ($query) {
                     $query->whereNotNull('body')->where('body', '!=', '');
                 })
@@ -358,6 +358,13 @@ class MockExamService
             if (Cache::has($cacheKey)) {
                 Cache::forget($cacheKey);
             }
+
+            $notificationTemplate = NOTIFICATION_TYPES['exam_completed'];
+            $notificationData = generateNotificationData('exam_completed', $notificationTemplate, [
+                'exam_id' => $mockExam->id,
+                'score' => round($totalScore)
+            ]);
+            addNotification($user, 'exam_completed', $notificationData);
 
             return [
                 'success' => true,
