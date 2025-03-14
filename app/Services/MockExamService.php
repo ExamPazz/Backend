@@ -84,35 +84,50 @@ class MockExamService
                 } else {
                     $selectedQuestionIds = [];
                     $totalQuestionsNeeded = $subject->number_of_questions;
+                    $remainingNeeded = $totalQuestionsNeeded;
 
                     // Get questions based on percentage distribution
                     foreach ($percentages as $sectionIdentifier => $sectionPercentages) {
-                        // Use the most recent year's percentage
                         $latestPercentage = $sectionPercentages->first();
                         $questionsNeeded = round(($latestPercentage->percentage_value / 100) * $totalQuestionsNeeded);
-
-                        // Query to get questions for this section
+                        
+                        // Ensure last section gets the exact remaining count
+                        if ($remainingNeeded < $questionsNeeded) {
+                            $questionsNeeded = $remainingNeeded;
+                        }
+                        
                         $sectionQuestions = Question::query()
-                        ->where('subject_id', $subject_id)
-                        ->where(function ($query) use ($latestPercentage, $sectionIdentifier) {
-                            if ($latestPercentage->section) {
+                            ->where('subject_id', $subject_id)
+                            ->when($latestPercentage->section, function ($query) use ($latestPercentage) {
                                 $query->where('section_id', $latestPercentage->section->id);
-                            }
-                        })
-                        ->whereHas('topic', function ($query) {
-                            $query->whereNotNull('body')->where('body', '!=', '');
-                        })
-                        ->whereHas('questionOptions', function ($query) {
-                            $query->whereNotNull('value')->where('value', '!=', '');
-                        }, '>=', 4)
-                        ->inRandomOrder()
-                        ->limit($questionsNeeded)
-                        ->pluck('id')
-                        ->toArray();
-
+                            })
+                            ->has('questionOptions', '>=', 4)
+                            ->inRandomOrder()
+                            ->limit($questionsNeeded)
+                            ->pluck('id')
+                            ->toArray();
+                    
                         $selectedQuestionIds = array_merge($selectedQuestionIds, $sectionQuestions);
+                        $remainingNeeded -= count($sectionQuestions);
+                    }
+                    
+                    // If we still need more questions, get additional ones
+                    if ($remainingNeeded > 0) {
+                        $extraQuestions = Question::query()
+                            ->where('subject_id', $subject_id)
+                            ->whereNotIn('id', $selectedQuestionIds)
+                            ->has('questionOptions', '>=', 4)
+                            ->inRandomOrder()
+                            ->limit($remainingNeeded)
+                            ->pluck('id')
+                            ->toArray();
+                    
+                        $selectedQuestionIds = array_merge($selectedQuestionIds, $extraQuestions);
                     }
 
+                    if (count($selectedQuestionIds) !== $totalQuestionsNeeded) {
+                        throw new \Exception("Mismatch: Expected $totalQuestionsNeeded, got " . count($selectedQuestionIds));
+                    }
                     // If we don't have enough questions from the percentage distribution,
                     // fill the remaining slots with random questions
                     if (count($selectedQuestionIds) < $totalQuestionsNeeded) {
