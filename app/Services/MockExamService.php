@@ -29,221 +29,155 @@ class MockExamService
         if ($cachedExam = Cache::get($cacheKey)) {
             return $cachedExam;
         }
-
+    
         $examDetail = $user->latestExamDetail;
-
+    
         if (!$examDetail || empty($examDetail->subject_combinations)) {
             throw new \InvalidArgumentException('User must select exactly 4 subjects.');
         }
-
+    
         $subjects_ids = $examDetail->subject_combinations;
-
+    
         if (count($subjects_ids) !== 4) {
             throw new \InvalidArgumentException('User must select exactly 4 subjects.');
         }
-
+    
         $subjects_models = Subject::query()
             ->whereIn('id', $subjects_ids)
             ->get(['id', 'name'])
             ->keyBy('id');
-
+    
         $questionIds = [];
         $groupedQuestions = [];
-
         $userActiveSubscription = getUserCurrentActiveSubscription($user);
-
+    
         DB::beginTransaction();
         try {
             $mockExam = MockExam::query()->create([
                 'subscription_id' => $userActiveSubscription->id,
                 'user_id' => $user->id,
                 'start_time' => now(),
-                'end_time' => now()->addMinutes(90), // 1 hour 30 minutes
-                'question_order' => [] // Initialize empty array
+                'end_time' => now()->addMinutes(90),
+                'question_order' => []
             ]);
-
+    
             foreach ($subjects_ids as $subject_id) {
                 $subject = Subject::findOrFail($subject_id);
-
-                // Get the latest percentage configuration for this subject
+                $totalQuestionsNeeded = $subject->number_of_questions;
+                $selectedQuestionIds = [];
+                $remainingNeeded = $totalQuestionsNeeded;
+    
                 $percentages = ExamGeneratingPercentage::where('subject_id', $subject_id)
                     ->orderBy('year', 'desc')
                     ->get()
-                    ->groupBy(function ($item) {
-                        return $item->section_id ?? $item->section_code;
-                    });
-
-                if ($percentages->isEmpty()) {
-                    // If no percentages set, use the original random selection
-                    $selectedQuestionIds = Question::query()
+                    ->groupBy(fn($item) => $item->section_id ?? $item->section_code);
+    
+                foreach ($percentages as $sectionIdentifier => $sectionPercentages) {
+                    $latestPercentage = $sectionPercentages->first();
+                    $questionsNeeded = round(($latestPercentage->percentage_value / 100) * $totalQuestionsNeeded);
+    
+                    if ($remainingNeeded < $questionsNeeded) {
+                        $questionsNeeded = $remainingNeeded;
+                    }
+    
+                    $sectionQuestions = Question::query()
                         ->where('subject_id', $subject_id)
+                        ->when($latestPercentage->section, function ($query) use ($latestPercentage) {
+                            $query->where('section_id', $latestPercentage->section->id);
+                        })
+                        ->has('questionOptions', '>=', 4)
                         ->inRandomOrder()
-                        ->limit($subject->number_of_questions)
+                        ->limit($questionsNeeded)
                         ->pluck('id')
                         ->toArray();
-                } else {
-                    $selectedQuestionIds = [];
-                    $totalQuestionsNeeded = $subject->number_of_questions;
-                    $remainingNeeded = $totalQuestionsNeeded;
-
-                    // Get questions based on percentage distribution
-                    foreach ($percentages as $sectionIdentifier => $sectionPercentages) {
-                        $latestPercentage = $sectionPercentages->first();
-                        $questionsNeeded = round(($latestPercentage->percentage_value / 100) * $totalQuestionsNeeded);
-                        
-                        // Ensure last section gets the exact remaining count
-                        if ($remainingNeeded < $questionsNeeded) {
-                            $questionsNeeded = $remainingNeeded;
-                        }
-                        
-                        $sectionQuestions = Question::query()
-                            ->where('subject_id', $subject_id)
-                            ->when($latestPercentage->section, function ($query) use ($latestPercentage) {
-                                $query->where('section_id', $latestPercentage->section->id);
-                            })
-                            ->has('questionOptions', '>=', 4)
-                            ->inRandomOrder()
-                            ->limit($questionsNeeded)
-                            ->pluck('id')
-                            ->toArray();
-                    
-                        $selectedQuestionIds = array_merge($selectedQuestionIds, $sectionQuestions);
-                        $remainingNeeded -= count($sectionQuestions);
-                    }
-                    
-                    // If we still need more questions, get additional ones
-                    if ($remainingNeeded > 0) {
-                        $extraQuestions = Question::query()
-                            ->where('subject_id', $subject_id)
-                            ->whereNotIn('id', $selectedQuestionIds)
-                            ->has('questionOptions', '>=', 4)
-                            ->inRandomOrder()
-                            ->limit($remainingNeeded)
-                            ->pluck('id')
-                            ->toArray();
-                    
-                        $selectedQuestionIds = array_merge($selectedQuestionIds, $extraQuestions);
-                    }
-
-                    if (count($selectedQuestionIds) !== $totalQuestionsNeeded) {
-                        throw new \Exception("Mismatch: Expected $totalQuestionsNeeded, got " . count($selectedQuestionIds));
-                    }
-                    // If we don't have enough questions from the percentage distribution,
-                    // fill the remaining slots with random questions
-                    if (count($selectedQuestionIds) < $totalQuestionsNeeded) {
-                        $remainingNeeded = $totalQuestionsNeeded - count($selectedQuestionIds);
-                        $remainingQuestions = Question::query()
+    
+                    $selectedQuestionIds = array_merge($selectedQuestionIds, $sectionQuestions);
+                    $remainingNeeded -= count($sectionQuestions);
+                }
+    
+                if ($remainingNeeded > 0) {
+                    $extraQuestions = Question::query()
                         ->where('subject_id', $subject_id)
                         ->whereNotIn('id', $selectedQuestionIds)
-                        ->whereHas('topic', function ($query) {
-                            $query->whereNotNull('body')->where('body', '!=', '');
-                        })
-                        ->whereHas('questionOptions', function ($query) {
-                            $query->whereNotNull('value')->where('value', '!=', '');
-                        }, '>=', 4)
+                        ->has('questionOptions', '>=', 4)
                         ->inRandomOrder()
                         ->limit($remainingNeeded)
                         ->pluck('id')
                         ->toArray();
-
-                        $selectedQuestionIds = array_merge($selectedQuestionIds, $remainingQuestions);
-                    }
+    
+                    $selectedQuestionIds = array_merge($selectedQuestionIds, $extraQuestions);
                 }
-
-                // Create mock exam questions
-                $mockExamQuestions = array_map(function ($questionId) use ($mockExam, $subject_id) {
-                    return [
-                        'mock_exam_id' => $mockExam->id,
-                        'question_id' => $questionId,
-                        'subject_id' => $subject_id,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
-                }, $selectedQuestionIds);
-
+    
+                if (count($selectedQuestionIds) !== $totalQuestionsNeeded) {
+                    throw new \Exception("Mismatch: Expected $totalQuestionsNeeded, got " . count($selectedQuestionIds));
+                }
+    
+                $mockExamQuestions = array_map(fn($questionId) => [
+                    'mock_exam_id' => $mockExam->id,
+                    'question_id' => $questionId,
+                    'subject_id' => $subject_id,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ], $selectedQuestionIds);
+    
                 MockExamQuestion::query()->insert($mockExamQuestions);
                 $questionIds[$subject_id] = $selectedQuestionIds;
             }
-
+    
             foreach ($subjects_ids as $subjectId) {
                 $questions = Question::query()
-                ->select(['id', 'year', 'question', 'image_url', 'subject_id', 'topic_id', 'objective_id'])
-                ->with([
-                    'questionOptions' => function ($query) {
-                        $query->select(['id', 'question_id', 'value'])
-                            ->whereNotNull('value')
-                            ->where('value', '!=', '');
-                    },
-                    'topic:id,body',
-                    'objective:id,body'
-                ])
-                ->whereIn('id', $questionIds[$subjectId])
-                ->whereNotNull('topic_id')
-                ->whereHas('topic', function ($query) {
-                    $query->whereNotNull('body')->where('body', '!=', '');
-                })
-                ->has('questionOptions', '>=', 4) // Ensure minimum of 4 valid options
-                ->get();
-                //Structure response
-
+                    ->select(['id', 'year', 'question', 'image_url', 'subject_id', 'topic_id', 'objective_id'])
+                    ->with([
+                        'questionOptions:id,question_id,value',
+                        'topic:id,body',
+                        'objective:id,body'
+                    ])
+                    ->whereIn('id', $questionIds[$subjectId])
+                    ->whereNotNull('topic_id')
+                    ->has('questionOptions', '>=', 4)
+                    ->get();
+    
                 $groupedQuestions[ucwords($subjects_models[$subjectId]->name)] = [
                     'subject' => [
                         'id' => $subjects_models[$subjectId]->id,
                         'name' => ucwords($subjects_models[$subjectId]->name)
                     ],
-                    'questions' => $questions->map(function ($question) {
-                        return [
-                            'id' => $question->id,
-                            'year' => $question->year,
-                            'question' => $question->question,
-                            'image_url' => $question->image_url,
-                            'topic' => [
-                                'id' => $question->topic->id,
-                                'name' => $question->topic->name,
-                            ],
-                            'objective' => [
-                                'id' => $question->objective->id,
-                                'name' => $question->objective->name
-                            ],
-                            'options' => $question->questionOptions->shuffle()->map(function ($option) {
-                                return [
-                                    'id' => $option->id,
-                                    'value' => $option->value
-                                ];
-                            })->values()->toArray()
-                        ];
-                    })->toArray()
-
+                    'questions' => $questions->map(fn($question) => [
+                        'id' => $question->id,
+                        'year' => $question->year,
+                        'question' => $question->question,
+                        'image_url' => $question->image_url,
+                        'topic' => ['id' => $question->topic->id, 'name' => $question->topic->body],
+                        'objective' => ['id' => $question->objective->id, 'name' => $question->objective->body],
+                        'options' => $question->questionOptions->shuffle()->map(fn($option) => [
+                            'id' => $option->id,
+                            'value' => $option->value
+                        ])->values()->toArray()
+                    ])->toArray()
                 ];
             }
-
-            // Store the order information
+    
             $questionOrder = [];
             foreach ($groupedQuestions as $subjectName => $subjectData) {
                 $questionOrder[$subjectName] = [
-                    'questions' => collect($subjectData['questions'])->map(function ($q) {
-                        return [
-                            'id' => $q['id'],
-                            'options' => collect($q['options'])->pluck('id')->toArray()
-                        ];
-                    })->toArray()
+                    'questions' => collect($subjectData['questions'])->map(fn($q) => [
+                        'id' => $q['id'],
+                        'options' => collect($q['options'])->pluck('id')->toArray()
+                    ])->toArray()
                 ];
             }
-
+    
             $mockExam->update(['question_order' => $questionOrder]);
-
             DB::commit();
-
+    
             $groupedQuestions = ['questions' => $groupedQuestions, 'mock_exam_id' => $mockExam->id];
             Cache::put($cacheKey, $groupedQuestions, now()->addHours(2));
-
             return $groupedQuestions;
-
+    
         } catch (Exception $exception) {
             DB::rollBack();
             $this->handleExamError($user->id, $exception);
         }
-
     }
 
     public function clearExamCache($userId): void
