@@ -22,10 +22,10 @@ class SubscriptionService
     public function initiateSubscription(User $user, array $data): array
     {
         try {
-            $metadata = json_encode([
+            $metadata = [
                 'user_id' => $user->id,
                 'plan_id' => $data['plan_id'],
-            ]);            
+            ];
 
             $plan = SubscriptionPlan::query()->findOrFail($data['plan_id']);
 
@@ -75,8 +75,7 @@ class SubscriptionService
 
             if ($response['status'] && ($response['data']['status'] ?? '') === 'success') {
                 return DB::transaction(function () use ($response) {
-                    $metadata = json_decode($response['data']['metadata'], true) ?? [];
-                    if (!$metadata || !isset($metadata['user_id'], $metadata['plan_id'])) {
+                    $metadata = is_array($response['data']['metadata']) ? $response['data']['metadata'] : json_decode($response['data']['metadata'], true);                    if (!$metadata || !isset($metadata['user_id'], $metadata['plan_id'])) {
                         Log::error('Missing metadata in payment response', ['response' => $response]);
                         return [
                             'success' => false,
