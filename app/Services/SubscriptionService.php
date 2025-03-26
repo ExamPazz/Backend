@@ -61,77 +61,78 @@ class SubscriptionService
         try {
             $response = $this->paymentProvider->verifyPayment($reference);
 
-            // Log the response for debugging
             Log::info('Payment verification response:', $response);
 
-            // Validate response format
-            if (!is_array($response) || !isset($response['status'], $response['data'])) {
-                Log::error('Invalid payment response format', ['response' => $response]);
+            if (!isset($response['status']) || !$response['status']) {
                 return [
                     'success' => false,
-                    'message' => 'Invalid payment provider response'
+                    'message' => 'Payment verification failed'
                 ];
             }
 
-            if ($response['status'] && ($response['data']['status'] ?? '') === 'success') {
-                return DB::transaction(function () use ($response) {
-                    $metadata = is_array($response['data']['metadata']) ? $response['data']['metadata'] : json_decode($response['data']['metadata'], true);                    if (!$metadata || !isset($metadata['user_id'], $metadata['plan_id'])) {
-                        Log::error('Missing metadata in payment response', ['response' => $response]);
-                        return [
-                            'success' => false,
-                            'message' => 'Invalid payment response: Missing metadata'
-                        ];
-                    }
-
-                    $current_sub = Subscription::query()->latest()->firstWhere('user_id', $metadata['user_id']);
-                    if ($current_sub && $current_sub->status == 'active' && $current_sub->subscriptionPlan->name == 'freemium') {
-                        $current_sub->update(['status' => 'inactive']);
-                    }
-
-                    $subscription = Subscription::create([
-                        'user_id' => $metadata['user_id'],
-                        'subscription_plan_id' => $metadata['plan_id'],
-                        'status' => 'active'
-                    ]);
-
-                    Transaction::where('reference', $response['data']['reference'])
-                        ->update([
-                            'status' => 'completed',
-                            'subscription_id' => $subscription->id,
-                            'paid_at' => now(),
-                        ]);
-
-                    event(new SubscriptionCreated($subscription));
-
-                    $user = User::find($metadata['user_id']);
-                    if ($user) {
-                        $fcmToken = FcmToken::where('user_id', $user->id)->value('token');
-                        if ($fcmToken) {
-                            $subscription->load('subscriptionPlan'); // Ensure relationship is loaded
-                            $planName = $subscription->subscriptionPlan->name ?? 'your subscription';
-
-                            PushNotificationService::sendMessage($fcmToken, [
-                                'title' => 'Payment Successful',
-                                'body' => "Your payment for {$planName} plan was successful!",
-                            ]);
-                        }
-                        $user->refresh();
-                    }
-
-                    return [
-                        'success' => true,
-                        'message' => 'Subscription created successfully',
-                        'data' => $subscription
-                    ];
-                });
+            if (!isset($response['data']['status']) || $response['data']['status'] !== 'success') {
+                return [
+                    'success' => false,
+                    'message' => 'Payment was not successful'
+                ];
             }
 
-            return [
-                'success' => false,
-                'message' => 'Payment verification failed'
-            ];
+            // Make sure 'metadata' exists and is valid
+            $metadata = $response['data']['metadata'] ?? null;
+            if (!$metadata || !isset($metadata['user_id'], $metadata['plan_id'])) {
+                Log::error('Invalid metadata received from Paystack', ['metadata' => $metadata]);
+                return [
+                    'success' => false,
+                    'message' => 'Invalid payment response: Missing metadata'
+                ];
+            }
+
+            return DB::transaction(function () use ($response, $metadata) {
+                $user = User::find($metadata['user_id']);
+                if (!$user) {
+                    Log::error('User not found', ['user_id' => $metadata['user_id']]);
+                    return ['success' => false, 'message' => 'User not found'];
+                }
+
+                // Handle existing subscription
+                $current_sub = Subscription::where('user_id', $user->id)->latest()->first();
+                if ($current_sub && $current_sub->status == 'active' && $current_sub->subscriptionPlan->name == 'freemium') {
+                    $current_sub->update(['status' => 'inactive']);
+                }
+
+                // Create new subscription
+                $subscription = Subscription::create([
+                    'user_id' => $user->id,
+                    'subscription_plan_id' => $metadata['plan_id'],
+                    'status' => 'active'
+                ]);
+
+                // Update transaction
+                Transaction::where('reference', $response['data']['reference'])->update([
+                    'status' => 'completed',
+                    'subscription_id' => $subscription->id,
+                    'paid_at' => now(),
+                ]);
+
+                event(new SubscriptionCreated($subscription));
+
+                // Send push notification
+                $fcmToken = FcmToken::where('user_id', $user->id)->value('token');
+                if ($fcmToken) {
+                    PushNotificationService::sendMessage($fcmToken, [
+                        'title' => 'Payment Successful',
+                        'body' => "Your payment for the {$subscription->subscriptionPlan->name} plan was successful!",
+                    ]);
+                }
+
+                return [
+                    'success' => true,
+                    'message' => 'Subscription created successfully',
+                    'data' => $subscription
+                ];
+            });
         } catch (\Exception $e) {
-            Log::error('Subscription verification failed: ' . $e->getMessage(), $e->getTrace());
+            Log::error('Subscription verification failed: ' . $e->getMessage(), ['exception' => $e]);
             return [
                 'success' => false,
                 'message' => 'An unexpected error occurred while verifying the subscription'
