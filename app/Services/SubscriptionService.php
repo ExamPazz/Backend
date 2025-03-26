@@ -22,10 +22,10 @@ class SubscriptionService
     public function initiateSubscription(User $user, array $data): array
     {
         try {
-            $metadata = [
+            $metadata = json_encode([
                 'user_id' => $user->id,
                 'plan_id' => $data['plan_id'],
-            ];
+            ]);            
 
             $plan = SubscriptionPlan::query()->findOrFail($data['plan_id']);
 
