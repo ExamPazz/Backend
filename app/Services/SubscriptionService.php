@@ -114,9 +114,8 @@ class SubscriptionService
                     'paid_at' => now(),
                 ]);
 
-                event(new SubscriptionCreated($subscription));
+                // event(new SubscriptionCreated($subscription));
 
-                // Send push notification
                 $fcmToken = FcmToken::where('user_id', $user->id)->value('token');
                 if ($fcmToken) {
                     PushNotificationService::sendMessage($fcmToken, [
