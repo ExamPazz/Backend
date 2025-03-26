@@ -75,7 +75,7 @@ class SubscriptionService
 
             if ($response['status'] && ($response['data']['status'] ?? '') === 'success') {
                 return DB::transaction(function () use ($response) {
-                    $metadata = $response['data']['metadata'] ?? null;
+                    $metadata = json_decode($response['data']['metadata'], true) ?? [];
                     if (!$metadata || !isset($metadata['user_id'], $metadata['plan_id'])) {
                         Log::error('Missing metadata in payment response', ['response' => $response]);
                         return [
