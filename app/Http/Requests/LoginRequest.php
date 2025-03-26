@@ -8,6 +8,7 @@ use App\Events\UserRegistrationEvent;
 use App\Exceptions\AppException;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\FcmToken;
 use App\Support\ApiResponse;
 use App\Support\OtpHelper;
 use Illuminate\Auth\Events\Lockout;
@@ -36,6 +37,7 @@ class LoginRequest extends FormRequest
         return [
             'email' => ['required', 'exists:users'],
             'password' => ['required', 'string'],
+            'fcm_token' => ['nullable', 'string'], // Validate FCM token
         ];
     }
 
@@ -69,6 +71,12 @@ class LoginRequest extends FormRequest
             return ApiResponse::failure("Your email is not verified!. Verification code has been sent to your email", statusCode: 401);
         }
 
+        if ($this->has('fcm_token')) {
+            FcmToken::updateOrCreate(
+                ['user_id' => $user->id], 
+                ['token' => $this->fcm_token]
+            );
+        }
         RateLimiter::clear($this->throttleKey());
 
         $hasExamDetail = $user->latestExamDetail()->exists();

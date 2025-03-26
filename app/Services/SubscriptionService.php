@@ -6,7 +6,9 @@ use App\Contracts\PaymentProviderInterface;
 use App\Models\Transaction;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Models\FcmToken;
 use App\Models\SubscriptionPlan;
+use App\Services\Notification\PushNotificationService;
 use App\Events\SubscriptionCreated;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -59,19 +61,32 @@ class SubscriptionService
         try {
             $response = $this->paymentProvider->verifyPayment($reference);
 
-            if ($response['status'] && $response['data']['status'] === 'success') {
+            // Log the response for debugging
+            Log::info('Payment verification response:', $response);
+
+            // Validate response format
+            if (!is_array($response) || !isset($response['status'], $response['data'])) {
+                Log::error('Invalid payment response format', ['response' => $response]);
+                return [
+                    'success' => false,
+                    'message' => 'Invalid payment provider response'
+                ];
+            }
+
+            if ($response['status'] && ($response['data']['status'] ?? '') === 'success') {
                 return DB::transaction(function () use ($response) {
-                    $metadata = $response['data']['metadata'];
+                    $metadata = $response['data']['metadata'] ?? null;
+                    if (!$metadata || !isset($metadata['user_id'], $metadata['plan_id'])) {
+                        Log::error('Missing metadata in payment response', ['response' => $response]);
+                        return [
+                            'success' => false,
+                            'message' => 'Invalid payment response: Missing metadata'
+                        ];
+                    }
 
                     $current_sub = Subscription::query()->latest()->firstWhere('user_id', $metadata['user_id']);
-                    if ($current_sub && $current_sub->status == 'active')
-                    {
-                       if ($current_sub->subscriptionPlan->name == 'freemium')
-                       {
-                           $current_sub->update([
-                               'status' => 'inactive'
-                           ]);
-                       }
+                    if ($current_sub && $current_sub->status == 'active' && $current_sub->subscriptionPlan->name == 'freemium') {
+                        $current_sub->update(['status' => 'inactive']);
                     }
 
                     $subscription = Subscription::create([
@@ -90,7 +105,19 @@ class SubscriptionService
                     event(new SubscriptionCreated($subscription));
 
                     $user = User::find($metadata['user_id']);
-                    $user->refresh();
+                    if ($user) {
+                        $fcmToken = FcmToken::where('user_id', $user->id)->value('token');
+                        if ($fcmToken) {
+                            $subscription->load('subscriptionPlan'); // Ensure relationship is loaded
+                            $planName = $subscription->subscriptionPlan->name ?? 'your subscription';
+
+                            PushNotificationService::sendMessage($fcmToken, [
+                                'title' => 'Payment Successful',
+                                'body' => "Your payment for {$planName} plan was successful!",
+                            ]);
+                        }
+                        $user->refresh();
+                    }
 
                     return [
                         'success' => true,
@@ -105,8 +132,12 @@ class SubscriptionService
                 'message' => 'Payment verification failed'
             ];
         } catch (\Exception $e) {
-            Log::error('Subscription verification failed: ' . $e->getMessage());
-            throw $e;
+            Log::error('Subscription verification failed: ' . $e->getMessage(), $e->getTrace());
+            return [
+                'success' => false,
+                'message' => 'An unexpected error occurred while verifying the subscription'
+            ];
         }
     }
+
 }
