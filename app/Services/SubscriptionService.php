@@ -134,7 +134,7 @@ class SubscriptionService
             Log::error('Subscription verification failed: ' . $e->getMessage(), ['exception' => $e]);
             return [
                 'success' => false,
-                'message' => 'An unexpected error occurred while verifying the subscription'
+                'message' => $e->getMessage()
             ];
         }
     }
