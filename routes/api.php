@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\SubscriptionPlanController;
+use App\Http\Controllers\Admin\AdminLoginController;
 use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\ExamDetailController;
 use App\Http\Controllers\Auth\GoogleAuthController;
@@ -185,4 +186,9 @@ Route::group(
             Route::get('url', [GoogleAuthController::class, 'getAuthUrl']);
             Route::post('callback', [GoogleAuthController::class, 'handleCallback']);
         });
+
+        Route::group(['prefix' => 'admin'], function () {
+            Route::post('login', [AdminLoginController::class, 'login']);
+        });
+
     });
