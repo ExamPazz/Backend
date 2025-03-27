@@ -116,7 +116,7 @@ class SubscriptionService
 
                 // event(new SubscriptionCreated($subscription));
 
-                $fcmToken = FcmToken::where('user_id', $user->id)->value('token');
+                $fcmToken = $user->fcm_token;
                 if ($fcmToken) {
                     PushNotificationService::sendMessage($fcmToken, [
                         'title' => 'Payment Successful',
