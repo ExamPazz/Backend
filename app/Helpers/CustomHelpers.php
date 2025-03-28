@@ -18,9 +18,10 @@ if (!function_exists('getUserCurrentActiveSubscription')) {
             ->latest()
             ->first();
 
-        if (!$activeSubscription) {
+        if (!$activeSubscription || $activeSubscription->subscription_plan_id == 1) {
             throw new Exception('No active Subscription');
         }
+
         return $activeSubscription;
     }
 }
