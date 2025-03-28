@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\SubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminLoginController;
+use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\ExamDetailController;
 use App\Http\Controllers\Auth\GoogleAuthController;
@@ -189,6 +190,7 @@ Route::group(
 
         Route::group(['prefix' => 'admin'], function () {
             Route::post('login', [AdminLoginController::class, 'login']);
+            Route::get('/dashboard/stats', [AdminDashboardController::class, 'stats'])->middleware(['auth:sanctum', 'admin']);
         });
 
     });
