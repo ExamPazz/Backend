@@ -192,7 +192,7 @@ Route::group(
             Route::post('login', [AdminLoginController::class, 'login']);
         
             Route::middleware(['auth:sanctum', 'admin'])->group(function () {
-                Route::get('/dashboard/stats', [AdminDashboardController::class, 'stats']);
+                Route::get('/dashboard/stats', [AdminDashboardController::class, 'getStats']);
             });
             Route::post('/users/change-role', [AdminDashboardController::class, 'changeRole']);
         });
