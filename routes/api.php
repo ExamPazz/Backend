@@ -190,7 +190,11 @@ Route::group(
 
         Route::group(['prefix' => 'admin'], function () {
             Route::post('login', [AdminLoginController::class, 'login']);
-            Route::get('/dashboard/stats', [AdminDashboardController::class, 'stats'])->middleware(['auth:sanctum', 'admin']);
+        
+            Route::middleware(['auth:sanctum', 'admin'])->group(function () {
+                Route::get('/dashboard/stats', [AdminDashboardController::class, 'stats']);
+            });
+            Route::post('/users/change-role', [AdminDashboardController::class, 'changeRole']);
         });
 
     });
