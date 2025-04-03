@@ -7,7 +7,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: false
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
