@@ -2,14 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\Request;
 use App\Models\Referral;
 use App\Support\ApiResponse;
 
 class ReferralController extends Controller
 {
-    public function referralStats()
+    public function referralStats(Request $request)
     {
-        $user = auth()->user();
+        $user = $request->user();
 
         $referrals = Referral::where('referrer_id', $user->id)->with('referred')->get();
         $completed = $referrals->where('status', 'completed')->count();
