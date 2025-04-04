@@ -8,6 +8,7 @@ use App\Http\Controllers\ExamDetailController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\OTPController;
+use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\ResetPasswordController;
 use App\Http\Controllers\UserProfileController;
@@ -187,6 +188,9 @@ Route::group(
             Route::get('url', [GoogleAuthController::class, 'getAuthUrl']);
             Route::post('callback', [GoogleAuthController::class, 'handleCallback']);
         });
+
+        Route::get('/referral/stats', [ReferralController::class, 'referralStats']);
+
 
         Route::group(['prefix' => 'admin'], function () {
             Route::post('login', [AdminLoginController::class, 'login']);

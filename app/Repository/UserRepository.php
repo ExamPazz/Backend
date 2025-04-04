@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\UserProfile;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
+use App\Models\Referral;
 use Illuminate\Support\Facades\DB;
 
 class UserRepository
@@ -17,9 +18,19 @@ class UserRepository
             $user = User::query()->create([
                 'full_name' => $request->input('full_name'),
                 'email' => $request->input('email'),
-                'password' => bcrypt($request->input('password'))
+                'password' => bcrypt($request->input('password')),
+                'referred_by' => $request->filled('referral_code')
+                ? User::where('referral_code', $request->referral_code)->first()->id
+                : null,
             ]);
 
+             // Create a referral record
+            if ($user->referred_by) {
+                Referral::create([
+                    'referrer_id' => $user->referred_by,
+                    'referred_id' => $user->id,
+                ]);
+            }
             UserProfile::query()->updateOrCreate(
                 [
                     'user_id' => $user->id

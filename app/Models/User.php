@@ -28,7 +28,8 @@ class User extends Authenticatable
         'uuid',
         'agreed_to_terms_of_use',
         'is_active',
-        'google_id'
+        'google_id',
+        'referral_code'
     ];
 
     protected $with = [
@@ -102,5 +103,13 @@ class User extends Authenticatable
     public function mockExams()
     {
         return $this->hasMany(MockExam::class);
+    }
+
+    protected static function booted()
+    {
+        static::created(function ($user) {
+            $user->referral_code = strtoupper(Str::random(6));
+            $user->save();
+        });
     }
 }
