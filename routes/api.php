@@ -167,6 +167,8 @@ Route::group(
             });
             Route::post('/utme-date', [UtmeDateController::class, 'store']);
             Route::get('/utme-date', [UtmeDateController::class, 'show']);
+            Route::get('/referral/stats', [ReferralController::class, 'referralStats']);
+
         });
 
         Route::post('/exam-generation-percentage/import', [ExamGenerationPercentageController::class, 'importFromCsv']);
@@ -188,8 +190,6 @@ Route::group(
             Route::get('url', [GoogleAuthController::class, 'getAuthUrl']);
             Route::post('callback', [GoogleAuthController::class, 'handleCallback']);
         });
-
-        Route::get('/referral/stats', [ReferralController::class, 'referralStats']);
 
 
         Route::group(['prefix' => 'admin'], function () {
