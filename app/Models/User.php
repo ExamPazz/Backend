@@ -112,4 +112,18 @@ class User extends Authenticatable
             $user->save();
         });
     }
+
+    public function ensureReferralCode()
+    {
+        if (!$this->referral_code) {
+            $this->referral_code = User::generateReferralCode();
+            $this->save();
+        }
+    }
+
+    public static function generateReferralCode($length = 6)
+    {
+        $characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        return substr(str_shuffle(str_repeat($characters, ceil($length / strlen($characters)))), 0, $length);
+    }
 }
