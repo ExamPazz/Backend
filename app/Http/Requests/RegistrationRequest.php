@@ -27,6 +27,7 @@ class RegistrationRequest extends FormRequest
             'region' => ['nullable', 'string'],
             'city' => ['nullable', 'string'],
             'age' => ['nullable', 'numeric'],
+            'referral_code' => 'nullable|exists:users,referral_code',
         ];
     }
 }

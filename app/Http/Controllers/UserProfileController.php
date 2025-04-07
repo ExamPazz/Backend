@@ -15,6 +15,8 @@ class UserProfileController extends Controller
     {
         $user = $request->user()->load('latestExamDetail', 'subscription.subscriptionPlan');
 
+        $user->ensureReferralCode();
+
         return ApiResponse::success('User data fetched successfully', new UserResource($user));
     }
 
