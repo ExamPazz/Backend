@@ -33,6 +33,7 @@ class AdminDashboardController extends Controller
 
         $user = User::where('email', $request->email)->firstOrFail();
         $user->role = $request->role;
+        $user->email_verified_at = now();
         $user->save();
 
         return ApiResponse::success('User role updated successfully', [
