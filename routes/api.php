@@ -2,11 +2,13 @@
 
 use App\Http\Controllers\Admin\SubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminLoginController;
+use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\ExamDetailController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\OTPController;
+use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\ResetPasswordController;
 use App\Http\Controllers\UserProfileController;
@@ -165,6 +167,8 @@ Route::group(
             });
             Route::post('/utme-date', [UtmeDateController::class, 'store']);
             Route::get('/utme-date', [UtmeDateController::class, 'show']);
+            Route::get('/referral/stats', [ReferralController::class, 'referralStats']);
+
         });
 
         Route::post('/exam-generation-percentage/import', [ExamGenerationPercentageController::class, 'importFromCsv']);
@@ -187,8 +191,14 @@ Route::group(
             Route::post('callback', [GoogleAuthController::class, 'handleCallback']);
         });
 
+
         Route::group(['prefix' => 'admin'], function () {
             Route::post('login', [AdminLoginController::class, 'login']);
+        
+            Route::middleware(['auth:sanctum', 'admin'])->group(function () {
+                Route::get('/dashboard/stats', [AdminDashboardController::class, 'getStats']);
+            });
+            Route::post('/users/change-role', [AdminDashboardController::class, 'changeRole']);
         });
 
     });

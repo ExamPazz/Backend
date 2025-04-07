@@ -82,6 +82,7 @@ class LoginRequest extends FormRequest
         $hasExamDetail = $user->latestExamDetail()->exists();
 
         $access_token = $user->createToken('auth_token')->plainTextToken;
+        $user->ensureReferralCode();
         return ApiResponse::success('Login Successful', [
             'user' => $user->load('subscription.subscriptionPlan'),
             'has_exam_detail' => $hasExamDetail,

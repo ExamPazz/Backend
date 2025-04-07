@@ -12,6 +12,8 @@ use App\Services\Notification\PushNotificationService;
 use App\Events\SubscriptionCreated;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Notifications\ReferralRewardNotification;
+use App\Models\Wallet;
 
 class SubscriptionService
 {
@@ -106,6 +108,27 @@ class SubscriptionService
                     'subscription_plan_id' => $metadata['plan_id'],
                     'status' => 'active'
                 ]);
+
+                // REFERRAL REWARD LOGIC HERE
+                $referral = \App\Models\Referral::where('referred_id', $user->id)
+                ->where('status', 'pending')
+                ->first();
+
+            if ($referral) {
+                if ($referral->referrer_id == $user->id) {
+                    $referral->update(['status' => 'fraudulent']);
+                } else {
+                    $referral->update(['status' => 'completed']);
+
+                    // Reward the referrer
+                    $wallet = Wallet::firstOrCreate(['user_id' => $referral->referrer_id]);
+                    $wallet->increment('balance', 500); // ₦500 reward
+
+                    // Send in-app notification to the referrer
+                    $referrer = User::find($referral->referrer_id);
+                    $referrer->notify(new ReferralRewardNotification($user));
+                }
+            }
 
                 // Update transaction
                 Transaction::where('reference', $response['data']['reference'])->update([
