@@ -40,7 +40,7 @@ jobs:
           sudo rm -rf /var/www/html/dev/dev-exampazz-backend
           sudo mkdir /var/www/html/dev/dev-exampazz-backend
           sudo chown -R $USER:www-data /var/www/html/dev/dev-exampazz-backend
-          cp ~/exampazz/.env /var/www/html/dev/dev-exampazz-backend/
+          cp ~/dev-exampazz/.env /var/www/html/dev/dev-exampazz-backend/
 
     - name: Synchronize Files To Server
       uses: easingthemes/ssh-deploy@v5.1.0
