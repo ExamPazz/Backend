@@ -7,7 +7,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: false
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
@@ -38,10 +37,10 @@ jobs:
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
-          sudo rm -rf /var/www/html/exampazz-backend
-          sudo mkdir /var/www/html/exampazz-backend
-          sudo chown -R $USER:www-data /var/www/html/exampazz-backend
-          cp ~/exampazz/.env /var/www/html/exampazz-backend/
+          sudo rm -rf /var/www/html/dev/exampazz-backend
+          sudo mkdir /var/www/html/dev/exampazz-backend
+          sudo chown -R $USER:www-data /var/www/html/dev/exampazz-backend
+          cp ~/exampazz/.env /var/www/html/dev/exampazz-backend/
 
     - name: Synchronize Files To Server
       uses: easingthemes/ssh-deploy@v5.1.0
@@ -50,7 +49,7 @@ jobs:
         SOURCE: "."
         REMOTE_HOST: ${{ secrets.VPS_HOST }}
         REMOTE_USER: ${{ secrets.VPS_USER }}
-        TARGET: "/var/www/html/exampazz-backend"
+        TARGET: "/var/www/html/dev/exampazz-backend"
         EXCLUDE: "/node_modules/"
 
     - name: Run Remote/Artisan Commands
@@ -60,7 +59,7 @@ jobs:
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
-          cd /var/www/html/exampazz-backend
+          cd /var/www/html/dev/exampazz-backend
           sudo find . -type f -exec chmod 664 {} \;   
           sudo find . -type d -exec chmod 775 {} \;
           sudo chgrp -R www-data storage bootstrap/cache
