@@ -17,7 +17,6 @@ class AdminLoginController extends Controller
         $user = User::query()->where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
-            RateLimiter::hit($this->throttleKey());
             return ApiResponse::failure("Credentials do not match our records.");
         }
 
