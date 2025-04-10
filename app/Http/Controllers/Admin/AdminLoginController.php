@@ -14,7 +14,7 @@ class AdminLoginController extends Controller
 
     public function login(AdminLoginRequest $request)
     {
-        $user = User::query()->where('email', $request->email)->first();
+        $user = User::where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return ApiResponse::failure("Credentials do not match our records.");
